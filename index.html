@@ -2239,16 +2239,24 @@ async function togglePerm(uid, perm, val) {
 // ═══════════════════════════════════════════════════════════════
 // IMPORTAR EXCEL
 // ═══════════════════════════════════════════════════════════════
+let _importAba = 'importar';
+
 function renderImportar() {
   document.getElementById('topbarActions').innerHTML = '';
   document.getElementById('pageContent').innerHTML = `
+    <div class="tabs" style="margin-bottom:20px">
+      <div class="tab ${_importAba==='importar'?'active':''}" onclick="_importAba='importar';renderImportar()">⬆ Importar Excel</div>
+      <div class="tab ${_importAba==='comparar'?'active':''}" onclick="_importAba='comparar';renderImportar()">🔍 Comparar Excel × Site</div>
+    </div>
+
+    ${_importAba === 'importar' ? `
     <div style="max-width:640px">
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px">
         <div style="font-family:var(--font-head);font-size:14px;font-weight:700;margin-bottom:6px">📂 Importar planilha Excel</div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:16px">
           Selecione o arquivo <strong>LORS Madeiras.xlsx</strong>. O sistema irá importar as abas
           <em>Entradas</em>, <em>Saídas</em>, <em>Pagamentos</em> e <em>Recebimentos</em>.
-          Registros duplicados (mesma data + fornecedor/destino + volume) são ignorados automaticamente.
+          Registros duplicados são detectados automaticamente por fornecedor + volume + valor.
         </div>
         <div class="import-zone" onclick="document.getElementById('fileXlsx').click()">
           <div class="import-zone-icon">📊</div>
@@ -2262,9 +2270,79 @@ function renderImportar() {
         <div id="importLogContent"></div>
       </div>
     </div>
+    ` : `
+    <div style="max-width:900px">
+      <div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px">
+        <div style="font-family:var(--font-head);font-size:14px;font-weight:700;margin-bottom:6px">🔍 Comparar Excel × Site</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px">
+          Selecione o arquivo Excel para comparar com os dados do sistema.
+          <span style="display:inline-block;background:var(--green-lt);color:var(--green);padding:1px 8px;border-radius:10px;font-size:10px;margin-left:4px">✓ Igual</span>
+          <span style="display:inline-block;background:var(--yellow-lt);color:#92400e;padding:1px 8px;border-radius:10px;font-size:10px;margin-left:4px">⚠ Só no Excel</span>
+          <span style="display:inline-block;background:var(--blue-lt);color:var(--accent);padding:1px 8px;border-radius:10px;font-size:10px;margin-left:4px">ℹ Só no Site</span>
+        </div>
+        <div class="import-zone" onclick="document.getElementById('fileXlsxCmp').click()">
+          <div class="import-zone-icon">🔍</div>
+          <div class="import-zone-label">Clique para selecionar o arquivo Excel</div>
+          <div class="import-zone-sub">Formatos aceitos: .xlsx, .xls</div>
+        </div>
+        <input type="file" id="fileXlsxCmp" accept=".xlsx,.xls" style="display:none" onchange="compararExcel(this)">
+      </div>
+      <div id="cmpResult"></div>
+    </div>
+    `}
   `;
 }
 
+// ── Helpers de leitura ──
+function excelDate(val) {
+  if (!val && val !== 0) return '';
+  if (val instanceof Date) {
+    const y = val.getFullYear(), m = String(val.getMonth()+1).padStart(2,'0'), d = String(val.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  if (typeof val === 'number') {
+    const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    const y = d.getUTCFullYear(), mo = String(d.getUTCMonth()+1).padStart(2,'0'), dd = String(d.getUTCDate()).padStart(2,'0');
+    return `${y}-${mo}-${dd}`;
+  }
+  if (typeof val === 'string') {
+    const m = val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+    if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0,10);
+  }
+  return '';
+}
+
+function xlFrete(r) {
+  // Trata "Valor  Frete" com 1 ou 2 espaços
+  for (const k of Object.keys(r)) {
+    if (k.replace(/\s+/g,' ').trim() === 'Valor Frete (R$/ton)') return parseFloat(r[k]) || 0;
+  }
+  return 0;
+}
+
+function xlEspecie(r) {
+  const v = String(r['Espécie']||r['Especie']||'').toLowerCase();
+  return v.includes('eucal') ? 'eucalipto' : v.includes('pin') ? 'pinus' : 'outro';
+}
+
+function xlClasse(r) {
+  const v = String(r['Classe']||'').toLowerCase();
+  return v.includes('proc') ? 'processo' : v.includes('tor') ? 'toras' : v.includes('cav') ? 'cavacos' : 'outro';
+}
+
+function lerWorkbook(buffer) {
+  return XLSX.read(buffer, { type: 'array', cellDates: false });
+}
+
+function xlSheetRows(wb, ...names) {
+  for (const n of names) {
+    if (wb.SheetNames.includes(n)) return XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '' });
+  }
+  return [];
+}
+
+// ── IMPORTAR ──
 async function importarExcel(input) {
   const file = input.files[0];
   if (!file) return;
@@ -2273,154 +2351,277 @@ async function importarExcel(input) {
   logDiv.style.display = 'block';
   logContent.innerHTML = '<div style="color:var(--muted)">Lendo arquivo…</div>';
 
-  const buffer = await file.arrayBuffer();
-  const wb     = XLSX.read(buffer, { type: 'array', cellDates: true });
-
+  const wb = lerWorkbook(await file.arrayBuffer());
   const results = [];
 
   // ── Entradas ──
-  if (wb.SheetNames.includes('Entradas')) {
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets['Entradas'], { defval: '' });
-    let imp = 0, skip = 0;
-    for (const r of rows) {
-      const data = excelDate(r['Data']);
-      const forn = String(r['Nome Fornecedor Madeira']||'').trim();
-      const vol  = parseFloat(r['Volume (Ton)']||r['Volume (ton)']) || 0;
-      if (!data || !forn || !vol) { skip++; continue; }
-      // Deduplicação
-      const existe = entradas.some(e => e.data === data && e.fornecedor === forn && e.volume === vol);
+  const rowsE = xlSheetRows(wb, 'Entradas');
+  { let imp = 0, skip = 0, erros = [];
+    for (const r of rowsE) {
+      const forn   = String(r['Nome Fornecedor Madeira']||'').trim();
+      const vol    = parseFloat(r['Volume (Ton)']||r['Volume (ton)']||0) || 0;
+      const madTon = parseFloat(r['Valor Madeira (R$/ton)']||r['Valor Madeira (R$/Ton)']||0) || 0;
+      const colTon = parseFloat(r['Valor Colheita/Carregamento (R$/ton)']||r['Valor Colheita/Carregamento (R$/Ton)']||0) || 0;
+      const trbTon = parseFloat(r['Valor Transbordo (R$/ton)']||r['Valor Transbordo (R$/Ton)']||0) || 0;
+      const total  = parseFloat(r['Total Valor (R$)']||0) || vol * (madTon + colTon + trbTon);
+      if (!forn || !vol) { skip++; continue; }
+      // Deduplicação por fornecedor + volume + total (sem depender de data)
+      const existe = entradas.some(e =>
+        e.fornecedor === forn && e.volume === vol && Math.abs((e.totalValor||0) - total) < 0.05);
       if (existe) { skip++; continue; }
-      const espRaw = String(r['Espécie']||r['Especie']||'').toLowerCase();
-      const especie = espRaw.includes('eucal') ? 'eucalipto' : espRaw.includes('pin') ? 'pinus' : 'outro';
-      const claRaw  = String(r['Classe']||'').toLowerCase();
-      const classe  = claRaw.includes('proc') ? 'processo' : claRaw.includes('tor') ? 'toras' : claRaw.includes('cav') ? 'cavacos' : 'outro';
-      const madTon  = parseFloat(r['Valor Madeira (R$/ton)']||r['Valor Madeira (R$/Ton)']) || 0;
-      const colTon  = parseFloat(r['Valor Colheita/Carregamento (R$/ton)']||r['Valor Colheita/Carregamento (R$/Ton)']) || 0;
-      const trbTon  = parseFloat(r['Valor Transbordo (R$/ton)']||r['Valor Transbordo (R$/Ton)']) || 0;
-      const temTrb  = trbTon > 0;
-      await db.collection(COL_ENTRADAS).add({
-        data, fornecedor: forn, especie, especieObs: '', classe, classeObs: '',
-        volume: vol, unidade: 'ton',
-        valMadeiraTon: madTon, valMadeiraTotal: vol * madTon,
-        prestColheita: String(r['Nome Prestador Colheita/Carregamento']||'').trim(),
-        valColheitaTon: colTon, valColheitaTotal: vol * colTon,
-        temTransbordo: temTrb,
-        prestTransbordo: temTrb ? String(r['Nome Prestador Transbordo']||'').trim() : '',
-        valTransbordoTon: trbTon, valTransbordoTotal: vol * trbTon,
-        totalValor: vol * (madTon + colTon + trbTon),
-        obs: '', criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      imp++;
+      const data  = excelDate(r['Data']) || today();
+      const temTrb = trbTon > 0;
+      try {
+        await db.collection(COL_ENTRADAS).add({
+          data, fornecedor: forn, especie: xlEspecie(r), especieObs: '',
+          classe: xlClasse(r), classeObs: '', volume: vol, unidade: 'ton',
+          valMadeiraTon: madTon, valMadeiraTotal: vol * madTon,
+          prestColheita: String(r['Nome Prestador Colheita/Carregamento']||'').trim(),
+          valColheitaTon: colTon, valColheitaTotal: vol * colTon,
+          temTransbordo: temTrb,
+          prestTransbordo: temTrb ? String(r['Nome Prestador Transbordo']||'').trim() : '',
+          valTransbordoTon: trbTon, valTransbordoTotal: vol * trbTon,
+          totalValor: total, obs: '',
+          criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        imp++;
+      } catch(e) { erros.push(forn); }
     }
-    results.push({ aba: 'Entradas', imp, skip });
+    results.push({ aba: 'Entradas', imp, skip, erros });
   }
 
   // ── Saídas ──
-  if (wb.SheetNames.includes('Saídas') || wb.SheetNames.includes('Saidas')) {
-    const sheetName = wb.SheetNames.includes('Saídas') ? 'Saídas' : 'Saidas';
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' });
-    let imp = 0, skip = 0;
-    for (const r of rows) {
-      const data    = excelDate(r['Data carregamento']||r['Data']);
+  const rowsS = xlSheetRows(wb, 'Saídas', 'Saidas');
+  { let imp = 0, skip = 0, erros = [];
+    for (const r of rowsS) {
       const destino = String(r['Destino']||'').trim();
-      const vol     = parseFloat(r['Volume (ton)']||r['Volume (Ton)']) || 0;
-      if (!data || !destino || !vol) { skip++; continue; }
-      const existe = saidas.some(s => s.data === data && s.destino === destino && s.volume === vol);
+      const vol     = parseFloat(r['Volume (ton)']||r['Volume (Ton)']||0) || 0;
+      const madTon  = parseFloat(r['Valor Madeira (R$/ton)']||r['Valor Madeira (R$/Ton)']||0) || 0;
+      const frtTon  = xlFrete(r);
+      const total   = vol * (madTon + frtTon);
+      if (!destino || !vol) { skip++; continue; }
+      const existe = saidas.some(s =>
+        s.destino === destino && s.volume === vol && Math.abs((s.totalReceita||0) - total) < 0.05);
       if (existe) { skip++; continue; }
-      const espRaw  = String(r['Espécie']||r['Especie']||'').toLowerCase();
-      const especie = espRaw.includes('eucal') ? 'eucalipto' : espRaw.includes('pin') ? 'pinus' : 'outro';
-      const claRaw  = String(r['Classe']||'').toLowerCase();
-      const classe  = claRaw.includes('proc') ? 'processo' : claRaw.includes('tor') ? 'toras' : claRaw.includes('cav') ? 'cavacos' : 'outro';
-      const madTon  = parseFloat(r['Valor Madeira (R$/ton)']||r['Valor Madeira (R$/Ton)']) || 0;
-      const frtTon  = parseFloat(r['Valor  Frete (R$/ton)']||r['Valor Frete (R$/ton)']||r['Valor Frete (R$/Ton)']) || 0;
-      await db.collection(COL_SAIDAS).add({
-        data, caminhao: String(r['Caminhão Transporte']||r['Caminhao Transporte']||'').trim(),
-        especie, especieObs: '', classe, classeObs: '',
-        volume: vol, unidade: 'ton', destino,
-        valMadeiraTon: madTon, valMadeiraTotal: vol * madTon,
-        valFreteTon: frtTon, valFreteTotal: vol * frtTon,
-        totalReceita: vol * (madTon + frtTon),
-        emitente: '', nfNumero: '', obs: '',
-        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      imp++;
+      const data = excelDate(r['Data carregamento']||r['Data']) || today();
+      try {
+        await db.collection(COL_SAIDAS).add({
+          data, destino, volume: vol, unidade: 'ton',
+          caminhao: String(r['Caminhão Transporte']||r['Caminhao Transporte']||'').trim(),
+          especie: xlEspecie(r), especieObs: '', classe: xlClasse(r), classeObs: '',
+          valMadeiraTon: madTon, valMadeiraTotal: vol * madTon,
+          valFreteTon: frtTon, valFreteTotal: vol * frtTon,
+          totalReceita: total, emitente: '', nfNumero: '', obs: '',
+          criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        imp++;
+      } catch(e) { erros.push(destino); }
     }
-    results.push({ aba: 'Saídas', imp, skip });
+    results.push({ aba: 'Saídas', imp, skip, erros });
   }
 
   // ── Pagamentos ──
-  if (wb.SheetNames.includes('Pagamentos')) {
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets['Pagamentos'], { defval: '' });
-    let imp = 0, skip = 0;
-    for (const r of rows) {
-      const data     = excelDate(r['Data']);
+  const rowsP = xlSheetRows(wb, 'Pagamentos');
+  { let imp = 0, skip = 0, erros = [];
+    for (const r of rowsP) {
       const parceiro = String(r['Parceiro']||'').trim();
-      const valor    = parseFloat(r['Valor']) || 0;
-      if (!data || !parceiro || !valor) { skip++; continue; }
-      const existe = pagamentos.some(p => p.data === data && p.parceiro === parceiro && p.valor === valor);
+      const valor    = parseFloat(r['Valor']||0) || 0;
+      if (!parceiro || !valor) { skip++; continue; }
+      const existe = pagamentos.some(p =>
+        p.parceiro === parceiro && Math.abs((p.valor||0) - valor) < 0.01);
       if (existe) { skip++; continue; }
-      await db.collection(COL_PAGAMENTOS).add({
-        data, parceiro, valor,
-        referencia: String(r['Referência']||r['Referencia']||'').trim(),
-        status: 'pago', obs: '',
-        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      imp++;
+      const data = excelDate(r['Data']) || today();
+      try {
+        await db.collection(COL_PAGAMENTOS).add({
+          data, parceiro, valor,
+          referencia: String(r['Referência']||r['Referencia']||'').trim(),
+          status: 'pago', obs: '',
+          criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        imp++;
+      } catch(e) { erros.push(parceiro); }
     }
-    results.push({ aba: 'Pagamentos', imp, skip });
+    results.push({ aba: 'Pagamentos', imp, skip, erros });
   }
 
   // ── Recebimentos ──
-  if (wb.SheetNames.includes('Recebimentos')) {
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets['Recebimentos'], { defval: '' });
-    let imp = 0, skip = 0;
-    for (const r of rows) {
-      const data     = excelDate(r['Data']);
+  const rowsR = xlSheetRows(wb, 'Recebimentos');
+  { let imp = 0, skip = 0, erros = [];
+    for (const r of rowsR) {
       const parceiro = String(r['Parceiro']||'').trim();
-      const valor    = parseFloat(r['Valor']) || 0;
-      if (!data || !parceiro || !valor) { skip++; continue; }
-      const existe = recebimentos.some(rc => rc.data === data && rc.parceiro === parceiro && rc.valor === valor);
+      const valor    = parseFloat(r['Valor']||0) || 0;
+      if (!parceiro || !valor) { skip++; continue; }
+      const existe = recebimentos.some(rc =>
+        rc.parceiro === parceiro && Math.abs((rc.valor||0) - valor) < 0.01);
       if (existe) { skip++; continue; }
-      await db.collection(COL_RECEBIMENTOS).add({
-        data, parceiro, valor,
-        referencia: String(r['Referência']||r['Referencia']||'').trim(),
-        status: 'recebido', obs: '',
-        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      imp++;
+      const data = excelDate(r['Data']) || today();
+      try {
+        await db.collection(COL_RECEBIMENTOS).add({
+          data, parceiro, valor,
+          referencia: String(r['Referência']||r['Referencia']||'').trim(),
+          status: 'recebido', obs: '',
+          criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        imp++;
+      } catch(e) { erros.push(parceiro); }
     }
-    results.push({ aba: 'Recebimentos', imp, skip });
+    results.push({ aba: 'Recebimentos', imp, skip, erros });
   }
 
   logContent.innerHTML = results.map(r => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
-      <div>
-        <div style="font-weight:600">${r.aba}</div>
-        <div style="font-size:11px;color:var(--muted)">${r.skip} ignorado${r.skip!==1?'s':''} (duplicado/incompleto)</div>
+    <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:600">${r.aba}</div>
+          <div style="font-size:11px;color:var(--muted)">${r.skip} ignorado${r.skip!==1?'s':''} · ${r.erros.length} erro${r.erros.length!==1?'s':''}</div>
+        </div>
+        <div style="font-family:var(--font-head);font-size:20px;font-weight:700;color:${r.imp>0?'var(--green)':'var(--muted)'}">
+          +${r.imp} importado${r.imp!==1?'s':''}
+        </div>
       </div>
-      <div style="font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--green)">+${r.imp} importado${r.imp!==1?'s':''}</div>
+      ${r.erros.length ? `<div style="font-size:11px;color:var(--red);margin-top:4px">Erro em: ${r.erros.join(', ')}</div>` : ''}
     </div>
-  `).join('') + `<div style="margin-top:12px;font-size:12px;color:var(--muted)">Importação concluída. Os dados já estão disponíveis no sistema.</div>`;
+  `).join('') + `<div style="margin-top:12px;font-size:12px;color:var(--muted)">Concluído. Dados disponíveis no sistema.</div>`;
   toast('Importação concluída!', 'success');
   input.value = '';
 }
 
-function excelDate(val) {
-  if (!val) return '';
-  if (val instanceof Date) return val.toISOString().slice(0,10);
-  if (typeof val === 'number') {
-    // Serial Excel → Date
-    const d = new Date(Math.round((val - 25569) * 86400 * 1000));
-    return d.toISOString().slice(0,10);
+// ── COMPARAR ──
+async function compararExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('cmpResult').innerHTML = '<div style="color:var(--muted);padding:12px">Lendo arquivo…</div>';
+  const wb = lerWorkbook(await file.arrayBuffer());
+
+  function badge(tipo) {
+    if (tipo === 'ok')    return `<span class="badge badge-pago">✓ Igual</span>`;
+    if (tipo === 'excel') return `<span class="badge badge-pendente">⚠ Só no Excel</span>`;
+    if (tipo === 'site')  return `<span class="badge badge-processo">ℹ Só no Site</span>`;
+    return '';
   }
-  if (typeof val === 'string') {
-    // dd/mm/yyyy
-    const m = val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-    // yyyy-mm-dd
-    if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0,10);
+
+  let html = '';
+
+  // ── Entradas ──
+  const rowsE = xlSheetRows(wb, 'Entradas');
+  if (rowsE.length) {
+    const linhas = rowsE.filter(r => String(r['Nome Fornecedor Madeira']||'').trim());
+    // Marcar cada linha do Excel
+    const xlMarcado = linhas.map(r => {
+      const forn  = String(r['Nome Fornecedor Madeira']||'').trim();
+      const vol   = parseFloat(r['Volume (Ton)']||r['Volume (ton)']||0) || 0;
+      const total = parseFloat(r['Total Valor (R$)']||0) || 0;
+      const match = entradas.find(e =>
+        e.fornecedor === forn && e.volume === vol && Math.abs((e.totalValor||0) - total) < 0.05);
+      return { r, forn, vol, total, match };
+    });
+    // Entradas só no site
+    const somenteNoSite = entradas.filter(e =>
+      !xlMarcado.some(x => x.forn === e.fornecedor && x.vol === e.volume && Math.abs(x.total - (e.totalValor||0)) < 0.05));
+
+    html += `<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:20px">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-family:var(--font-head);font-weight:700">
+        Entradas — ${linhas.length} no Excel · ${entradas.length} no Site
+      </div>
+      <div style="overflow-x:auto"><table><thead><tr>
+        <th>Status</th><th>Fornecedor</th><th>Espécie</th><th class="r">Volume</th><th class="r">Total Custo</th>
+      </tr></thead><tbody>
+      ${xlMarcado.map(({r, forn, vol, total, match}) => `<tr style="${match?'':'background:var(--yellow-lt)'}">
+        <td>${badge(match?'ok':'excel')}</td>
+        <td>${forn}</td>
+        <td>${especieBadge(xlEspecie(r))}</td>
+        <td class="r">${fmtTon(vol)}</td>
+        <td class="r ${match?'':'valor-neg'}">${fmt(total || vol*(parseFloat(r['Valor Madeira (R$/ton)']||0)+parseFloat(r['Valor Colheita/Carregamento (R$/ton)']||0)+parseFloat(r['Valor Transbordo (R$/ton)']||0)))}</td>
+      </tr>`).join('')}
+      ${somenteNoSite.map(e => `<tr style="background:var(--blue-lt)">
+        <td>${badge('site')}</td>
+        <td>${e.fornecedor}</td>
+        <td>${especieBadge(e.especie)}</td>
+        <td class="r">${fmtTon(e.volume)}</td>
+        <td class="r valor-neu">${fmt(e.totalValor)}</td>
+      </tr>`).join('')}
+      </tbody></table></div></div>`;
   }
-  return '';
+
+  // ── Saídas ──
+  const rowsS = xlSheetRows(wb, 'Saídas', 'Saidas');
+  if (rowsS.length) {
+    const linhas = rowsS.filter(r => String(r['Destino']||'').trim());
+    const xlMarcado = linhas.map(r => {
+      const destino = String(r['Destino']||'').trim();
+      const vol     = parseFloat(r['Volume (ton)']||r['Volume (Ton)']||0) || 0;
+      const madTon  = parseFloat(r['Valor Madeira (R$/ton)']||0) || 0;
+      const frtTon  = xlFrete(r);
+      const total   = vol * (madTon + frtTon);
+      const match   = saidas.find(s =>
+        s.destino === destino && s.volume === vol && Math.abs((s.totalReceita||0) - total) < 0.05);
+      return { r, destino, vol, total, match };
+    });
+    const somenteNoSite = saidas.filter(s =>
+      !xlMarcado.some(x => x.destino === s.destino && x.vol === s.volume && Math.abs(x.total - (s.totalReceita||0)) < 0.05));
+
+    html += `<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:20px">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-family:var(--font-head);font-weight:700">
+        Saídas — ${linhas.length} no Excel · ${saidas.length} no Site
+      </div>
+      <div style="overflow-x:auto"><table><thead><tr>
+        <th>Status</th><th>Destino</th><th>Caminhão</th><th class="r">Volume</th><th class="r">Receita Total</th>
+      </tr></thead><tbody>
+      ${xlMarcado.map(({r, destino, vol, total, match}) => `<tr style="${match?'':'background:var(--yellow-lt)'}">
+        <td>${badge(match?'ok':'excel')}</td>
+        <td>${destino}</td>
+        <td>${String(r['Caminhão Transporte']||r['Caminhao Transporte']||'—').trim()}</td>
+        <td class="r">${fmtTon(vol)}</td>
+        <td class="r ${match?'valor-pos':'valor-neg'}">${fmt(total)}</td>
+      </tr>`).join('')}
+      ${somenteNoSite.map(s => `<tr style="background:var(--blue-lt)">
+        <td>${badge('site')}</td>
+        <td>${s.destino}</td>
+        <td>${s.caminhao||'—'}</td>
+        <td class="r">${fmtTon(s.volume)}</td>
+        <td class="r valor-neu">${fmt(s.totalReceita)}</td>
+      </tr>`).join('')}
+      </tbody></table></div></div>`;
+  }
+
+  // ── Pagamentos ──
+  const rowsP = xlSheetRows(wb, 'Pagamentos');
+  if (rowsP.length) {
+    const linhas = rowsP.filter(r => String(r['Parceiro']||'').trim());
+    const xlMarcado = linhas.map(r => {
+      const parceiro = String(r['Parceiro']||'').trim();
+      const valor    = parseFloat(r['Valor']||0) || 0;
+      const match    = pagamentos.find(p => p.parceiro === parceiro && Math.abs((p.valor||0) - valor) < 0.01);
+      return { parceiro, valor, ref: String(r['Referência']||r['Referencia']||''), match };
+    });
+    const somenteNoSite = pagamentos.filter(p =>
+      !xlMarcado.some(x => x.parceiro === p.parceiro && Math.abs(x.valor - (p.valor||0)) < 0.01));
+
+    html += `<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:20px">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-family:var(--font-head);font-weight:700">
+        Pagamentos — ${linhas.length} no Excel · ${pagamentos.length} no Site
+      </div>
+      <div style="overflow-x:auto"><table><thead><tr>
+        <th>Status</th><th>Parceiro</th><th>Referência</th><th class="r">Valor</th>
+      </tr></thead><tbody>
+      ${xlMarcado.map(x => `<tr style="${x.match?'':'background:var(--yellow-lt)'}">
+        <td>${badge(x.match?'ok':'excel')}</td>
+        <td>${x.parceiro}</td>
+        <td style="font-size:11px;color:var(--muted)">${x.ref||'—'}</td>
+        <td class="r valor-neg">${fmt(x.valor)}</td>
+      </tr>`).join('')}
+      ${somenteNoSite.map(p => `<tr style="background:var(--blue-lt)">
+        <td>${badge('site')}</td>
+        <td>${p.parceiro}</td>
+        <td style="font-size:11px;color:var(--muted)">${p.referencia||'—'}</td>
+        <td class="r valor-neu">${fmt(p.valor)}</td>
+      </tr>`).join('')}
+      </tbody></table></div></div>`;
+  }
+
+  if (!html) html = '<div style="color:var(--muted);padding:12px">Nenhuma aba reconhecida no arquivo.</div>';
+  document.getElementById('cmpResult').innerHTML = html;
+  input.value = '';
 }
 </script>
 </body>
