@@ -13,6 +13,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
 :root {
   --ink: #0f0e11;
@@ -475,6 +476,54 @@ input[type="checkbox"] { width: auto; cursor: pointer; }
   padding: 10px 12px;
 }
 
+/* ── Auth overlays ── */
+.auth-switch { font-size: 12px; color: var(--muted); text-align: center; margin-top: 16px; }
+.auth-switch a { color: var(--accent); cursor: pointer; text-decoration: underline; }
+.auth-panel { display: none; }
+.auth-panel.visible { display: block; }
+.auth-ok { color: var(--green); font-size: 12px; margin-top: 8px; min-height: 18px; }
+
+.status-overlay {
+  position: fixed; inset: 0;
+  background: #0f1f15;
+  display: none;
+  align-items: center; justify-content: center;
+  z-index: 999;
+}
+.status-overlay.open { display: flex; }
+.status-box {
+  background: #fff; border-radius: 12px; padding: 40px 36px;
+  width: 380px; max-width: 92vw; text-align: center;
+  box-shadow: 0 24px 64px rgba(0,0,0,.3);
+}
+.status-icon { font-size: 40px; margin-bottom: 12px; }
+.status-title { font-family: var(--font-head); font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+.status-sub { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+/* ── Admin ── */
+.user-card {
+  background: #fff; border: 1px solid var(--border); border-radius: var(--r);
+  padding: 14px 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.user-avatar {
+  width: 38px; height: 38px; border-radius: 50%; object-fit: cover;
+  background: var(--paper2); flex-shrink: 0;
+}
+.perm-check {
+  display: flex; align-items: center; gap: 4px; font-size: 11px; cursor: pointer;
+  background: var(--paper2); padding: 3px 8px; border-radius: 10px;
+}
+
+/* ── Import Excel ── */
+.import-zone {
+  border: 2px dashed var(--border); border-radius: var(--r); padding: 28px;
+  text-align: center; cursor: pointer; transition: border-color .15s, background .15s;
+}
+.import-zone:hover { border-color: var(--accent); background: var(--green-lt); }
+.import-zone-icon { font-size: 32px; margin-bottom: 8px; }
+.import-zone-label { font-size: 13px; font-weight: 500; }
+.import-zone-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .sidebar { display: none; }
@@ -493,19 +542,56 @@ input[type="checkbox"] { width: auto; cursor: pointer; }
   <div class="auth-box">
     <div class="auth-logo">🌲 LORS Madeiras</div>
     <div class="auth-sub">Sistema de gestão de madeira própria</div>
-    <input type="email" id="authEmail" placeholder="E-mail" />
-    <input type="password" id="authPass" placeholder="Senha" />
-    <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="signIn()">Entrar</button>
-    <div style="display:flex;align-items:center;gap:10px;margin:14px 0">
-      <div style="flex:1;height:1px;background:var(--border)"></div>
-      <span style="font-size:11px;color:var(--muted)">ou</span>
-      <div style="flex:1;height:1px;background:var(--border)"></div>
+
+    <!-- Painel Login -->
+    <div id="panelLogin" class="auth-panel visible">
+      <input type="email" id="authEmail" placeholder="E-mail" />
+      <input type="password" id="authPass" placeholder="Senha" />
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:0" onclick="signIn()">Entrar</button>
+      <div style="display:flex;align-items:center;gap:10px;margin:14px 0">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:11px;color:var(--muted)">ou</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+      <button class="btn-google" onclick="signInGoogle()">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z"/></svg>
+        Entrar com Google
+      </button>
+      <div class="auth-error" id="authErr"></div>
+      <div class="auth-switch">Não tem acesso? <a onclick="mostrarSolicitar()">Solicitar acesso</a></div>
     </div>
-    <button class="btn-google" onclick="signInGoogle()">
-      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z"/></svg>
-      Entrar com Google
-    </button>
-    <div class="auth-error" id="authErr"></div>
+
+    <!-- Painel Solicitar Acesso -->
+    <div id="panelSolicitar" class="auth-panel">
+      <input type="text"  id="cadNome"     placeholder="Seu nome completo" style="margin-bottom:10px" />
+      <input type="email" id="cadEmail"    placeholder="E-mail" style="margin-bottom:10px" />
+      <input type="password" id="cadSenha" placeholder="Senha (mín. 6 caracteres)" style="margin-bottom:10px" />
+      <input type="password" id="cadConf"  placeholder="Confirmar senha" style="margin-bottom:10px" />
+      <button class="btn btn-primary" id="btnSolicitar" style="width:100%;justify-content:center" onclick="solicitarAcesso()">Solicitar acesso</button>
+      <div class="auth-error" id="cadErr"></div>
+      <div class="auth-ok"   id="cadOk"></div>
+      <div class="auth-switch"><a onclick="mostrarLogin()">← Voltar ao login</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- PENDENTE -->
+<div class="status-overlay" id="pendingOverlay">
+  <div class="status-box">
+    <div class="status-icon">⏳</div>
+    <div class="status-title">Acesso Pendente</div>
+    <div class="status-sub" id="pendingInfo">Sua solicitação foi enviada ao administrador.<br>Aguarde a aprovação para acessar o sistema.</div>
+    <button class="btn" style="margin-top:20px" onclick="auth.signOut()">Sair</button>
+  </div>
+</div>
+
+<!-- BLOQUEADO -->
+<div class="status-overlay" id="blockedOverlay">
+  <div class="status-box">
+    <div class="status-icon" style="color:var(--red)">🚫</div>
+    <div class="status-title" style="color:var(--red)">Acesso Bloqueado</div>
+    <div class="status-sub">Seu acesso foi revogado pelo administrador.<br>Entre em contato caso acredite ser um engano.</div>
+    <button class="btn" style="margin-top:20px" onclick="auth.signOut()">Sair</button>
   </div>
 </div>
 
@@ -523,23 +609,36 @@ input[type="checkbox"] { width: auto; cursor: pointer; }
         <span class="nav-icon">📊</span> Dashboard
       </div>
       <div class="nav-section">Operações</div>
-      <div class="nav-item" onclick="navTo('entradas')">
+      <div class="nav-item" id="navEntradas" onclick="navTo('entradas')">
         <span class="nav-icon">📥</span> Entradas
       </div>
-      <div class="nav-item" onclick="navTo('saidas')">
+      <div class="nav-item" id="navSaidas" onclick="navTo('saidas')">
         <span class="nav-icon">📤</span> Saídas
       </div>
       <div class="nav-section">Financeiro</div>
-      <div class="nav-item" onclick="navTo('pagamentos')">
+      <div class="nav-item" id="navPagamentos" onclick="navTo('pagamentos')">
         <span class="nav-icon">💸</span> Pagamentos
       </div>
-      <div class="nav-item" onclick="navTo('recebimentos')">
+      <div class="nav-item" id="navRecebimentos" onclick="navTo('recebimentos')">
         <span class="nav-icon">💰</span> Recebimentos
+      </div>
+      <div class="nav-section">Sistema</div>
+      <div class="nav-item" id="navAdmin" style="display:none" onclick="navTo('admin')">
+        <span class="nav-icon">👥</span> Usuários
+      </div>
+      <div class="nav-item" id="navImport" style="display:none" onclick="navTo('importar')">
+        <span class="nav-icon">📂</span> Importar Excel
       </div>
     </nav>
     <div class="nav-foot">
-      <strong id="navUserEmail"></strong>
-      <a onclick="signOut()">Sair</a>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <img id="navAvatar" src="" style="width:30px;height:30px;border-radius:50%;object-fit:cover;background:rgba(255,255,255,.1)" onerror="this.style.display='none'">
+        <div>
+          <div id="navUserName" style="font-size:12px;color:rgba(255,255,255,.7);font-weight:500"></div>
+          <div id="navUserRole" style="font-size:10px;color:rgba(255,255,255,.35)"></div>
+        </div>
+      </div>
+      <a onclick="signOut()" style="font-size:11px">Sair</a>
     </div>
   </aside>
 
@@ -944,39 +1043,159 @@ let editingId = null;
 let unsubs = [];
 
 // ═══════════════════════════════════════════════════════════════
+// STATE — usuário logado
+// ═══════════════════════════════════════════════════════════════
+let currentUser = null;
+
+// ═══════════════════════════════════════════════════════════════
 // AUTH
 // ═══════════════════════════════════════════════════════════════
-auth.onAuthStateChanged(user => {
-  if (user) {
-    document.getElementById('authScreen').style.display = 'none';
-    document.getElementById('appShell').style.display  = 'flex';
-    document.getElementById('navUserEmail').textContent = user.email;
-    startListeners();
-    navTo('dashboard');
-  } else {
+auth.onAuthStateChanged(async user => {
+  // Limpa overlays
+  ['pendingOverlay','blockedOverlay'].forEach(id =>
+    document.getElementById(id).classList.remove('open'));
+
+  if (!user) {
     document.getElementById('authScreen').style.display = 'flex';
     document.getElementById('appShell').style.display  = 'none';
-    unsubs.forEach(u => u());
-    unsubs = [];
+    unsubs.forEach(u => u()); unsubs = [];
+    currentUser = null;
+    return;
   }
+
+  const isAdmin = user.email === ADMIN_EMAIL;
+  const ref     = db.collection('mad_users').doc(user.uid);
+  let snap      = await ref.get();
+
+  if (isAdmin) {
+    if (!snap.exists) {
+      await ref.set({
+        email: user.email, name: user.displayName || 'Admin',
+        photoURL: user.photoURL || '', role: 'admin', status: 'approved',
+        permissions: { entradas:true, saidas:true, pagamentos:true, recebimentos:true },
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } else if (snap.data().status !== 'approved') {
+      await ref.update({ status: 'approved', role: 'admin' });
+    }
+    currentUser = { uid: user.uid, email: user.email,
+      name: user.displayName || 'Admin', photoURL: user.photoURL || '',
+      role: 'admin', status: 'approved',
+      permissions: { entradas:true, saidas:true, pagamentos:true, recebimentos:true } };
+  } else {
+    // Primeiro login Google → cria doc pendente
+    if (!snap.exists) {
+      await ref.set({
+        email: user.email, name: user.displayName || user.email,
+        photoURL: user.photoURL || '', role: 'viewer', status: 'pending',
+        permissions: { entradas:true, saidas:true, pagamentos:true, recebimentos:true },
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      snap = await ref.get();
+    }
+    const ud = snap.data();
+    currentUser = { uid: user.uid, email: user.email,
+      name: ud.name || user.displayName || user.email,
+      photoURL: ud.photoURL || user.photoURL || '', ...ud };
+
+    if (ud.status === 'pending') {
+      document.getElementById('pendingInfo').textContent =
+        `${ud.name || user.email} — ${user.email}\nSua solicitação foi enviada ao administrador. Aguarde a aprovação.`;
+      document.getElementById('pendingOverlay').classList.add('open');
+      document.getElementById('authScreen').style.display = 'none';
+      return;
+    }
+    if (ud.status === 'blocked') {
+      document.getElementById('blockedOverlay').classList.add('open');
+      document.getElementById('authScreen').style.display = 'none';
+      return;
+    }
+  }
+
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appShell').style.display   = 'flex';
+  applyUserUI();
+  startListeners();
+  navTo('dashboard');
 });
+
+function applyUserUI() {
+  const u = currentUser;
+  document.getElementById('navAvatar').src      = u.photoURL || '';
+  document.getElementById('navUserName').textContent = u.name || u.email;
+  document.getElementById('navUserRole').textContent =
+    u.role === 'admin' ? 'Administrador' : u.role === 'editor' ? 'Editor' : 'Visualizador';
+  if (u.role === 'admin') {
+    document.getElementById('navAdmin').style.display  = 'flex';
+    document.getElementById('navImport').style.display = 'flex';
+  }
+  // Permissões por seção (não-admin)
+  if (u.role !== 'admin' && u.permissions) {
+    const map = { entradas:'navEntradas', saidas:'navSaidas', pagamentos:'navPagamentos', recebimentos:'navRecebimentos' };
+    Object.entries(map).forEach(([k, id]) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = u.permissions[k] === false ? 'none' : 'flex';
+    });
+  }
+}
 
 function signIn() {
   const email = document.getElementById('authEmail').value.trim();
   const pass  = document.getElementById('authPass').value;
   document.getElementById('authErr').textContent = '';
   auth.signInWithEmailAndPassword(email, pass)
-    .catch(e => { document.getElementById('authErr').textContent = 'E-mail ou senha inválidos.'; });
+    .catch(() => { document.getElementById('authErr').textContent = 'E-mail ou senha inválidos.'; });
 }
 function signInGoogle() {
   document.getElementById('authErr').textContent = '';
   const provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider)
-    .catch(e => { document.getElementById('authErr').textContent = 'Erro ao entrar com Google: ' + e.message; });
+    .catch(e => { document.getElementById('authErr').textContent = 'Erro: ' + e.message; });
 }
-document.getElementById('authPass').addEventListener('keydown', e => { if (e.key === 'Enter') signIn(); });
-
 function signOut() { auth.signOut(); }
+
+function mostrarSolicitar() {
+  document.getElementById('panelLogin').classList.remove('visible');
+  document.getElementById('panelSolicitar').classList.add('visible');
+}
+function mostrarLogin() {
+  document.getElementById('panelSolicitar').classList.remove('visible');
+  document.getElementById('panelLogin').classList.add('visible');
+}
+
+async function solicitarAcesso() {
+  const nome  = document.getElementById('cadNome').value.trim();
+  const email = document.getElementById('cadEmail').value.trim();
+  const senha = document.getElementById('cadSenha').value;
+  const conf  = document.getElementById('cadConf').value;
+  const errEl = document.getElementById('cadErr');
+  const okEl  = document.getElementById('cadOk');
+  const btn   = document.getElementById('btnSolicitar');
+  errEl.textContent = ''; okEl.textContent = '';
+  if (!nome)            { errEl.textContent = 'Informe seu nome.'; return; }
+  if (!email)           { errEl.textContent = 'Informe o e-mail.'; return; }
+  if (senha.length < 6) { errEl.textContent = 'Senha deve ter ao menos 6 caracteres.'; return; }
+  if (senha !== conf)   { errEl.textContent = 'As senhas não conferem.'; return; }
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(email, senha);
+    await cred.user.updateProfile({ displayName: nome });
+    await db.collection('mad_users').doc(cred.user.uid).set({
+      email, name: nome, photoURL: '', role: 'viewer', status: 'pending',
+      permissions: { entradas:true, saidas:true, pagamentos:true, recebimentos:true },
+      criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await auth.signOut();
+    okEl.textContent = '✓ Solicitação enviada! Aguarde a aprovação do administrador.';
+    ['cadNome','cadEmail','cadSenha','cadConf'].forEach(id => document.getElementById(id).value = '');
+  } catch(err) {
+    const msgs = { 'auth/email-already-in-use':'Este e-mail já está cadastrado.', 'auth/invalid-email':'E-mail inválido.' };
+    errEl.textContent = msgs[err.code] || 'Erro: ' + err.message;
+  }
+  btn.disabled = false; btn.textContent = 'Solicitar acesso';
+}
+
+document.getElementById('authPass').addEventListener('keydown', e => { if (e.key === 'Enter') signIn(); });
 
 // ═══════════════════════════════════════════════════════════════
 // REALTIME LISTENERS
@@ -1016,11 +1235,13 @@ function startListeners() {
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════════
 const pages = {
-  dashboard:    { title: 'Dashboard',    sub: 'Visão geral das operações' },
-  entradas:     { title: 'Entradas',     sub: 'Compras e custos de aquisição de madeira' },
-  saidas:       { title: 'Saídas',       sub: 'Vendas e faturamento de cargas' },
-  pagamentos:   { title: 'Pagamentos',   sub: 'Controle de pagamentos a fornecedores' },
-  recebimentos: { title: 'Recebimentos', sub: 'Controle de recebimentos de clientes' },
+  dashboard:    { title: 'Dashboard',      sub: 'Visão geral das operações' },
+  entradas:     { title: 'Entradas',       sub: 'Compras e custos de aquisição de madeira' },
+  saidas:       { title: 'Saídas',         sub: 'Vendas e faturamento de cargas' },
+  pagamentos:   { title: 'Pagamentos',     sub: 'Controle de pagamentos a fornecedores' },
+  recebimentos: { title: 'Recebimentos',   sub: 'Controle de recebimentos de clientes' },
+  admin:        { title: 'Usuários',       sub: 'Gerenciamento de acesso ao sistema' },
+  importar:     { title: 'Importar Excel', sub: 'Importar dados da planilha LORS Madeiras.xlsx' },
 };
 
 function navTo(page) {
@@ -1039,6 +1260,8 @@ function navTo(page) {
     saidas:       renderSaidas,
     pagamentos:   renderPagamentos,
     recebimentos: renderRecebimentos,
+    admin:        renderAdmin,
+    importar:     renderImportar,
   };
   renders[page]();
 }
@@ -1895,6 +2118,310 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
     if (e.target === overlay) overlay.classList.remove('open');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN — Gerenciamento de usuários
+// ═══════════════════════════════════════════════════════════════
+const PERM_LABELS = { entradas:'Entradas', saidas:'Saídas', pagamentos:'Pagamentos', recebimentos:'Recebimentos' };
+
+async function renderAdmin() {
+  document.getElementById('topbarActions').innerHTML = '';
+  const snap  = await db.collection('mad_users').get();
+  const users = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+  const pending  = users.filter(u => u.status === 'pending');
+  const approved = users.filter(u => u.status === 'approved');
+  const blocked  = users.filter(u => u.status === 'blocked');
+
+  function userCard(u, actions) {
+    return `<div class="user-card">
+      <img class="user-avatar" src="${u.photoURL||''}" onerror="this.style.display='none'">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px">${u.name||'—'}</div>
+        <div style="font-size:11px;color:var(--muted)">${u.email}</div>
+      </div>
+      ${actions}
+    </div>`;
+  }
+
+  function permChecks(u) {
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">` +
+      Object.entries(PERM_LABELS).map(([k,l]) =>
+        `<label class="perm-check">
+          <input type="checkbox" ${(u.permissions||{})[k]!==false?'checked':''}
+            onchange="togglePerm('${u.uid}','${k}',this.checked)">
+          ${l}
+        </label>`
+      ).join('') + `</div>`;
+  }
+
+  function roleSelect(u) {
+    return `<select onchange="setRole('${u.uid}',this.value)"
+      style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-family:var(--font-mono)">
+      <option value="viewer" ${u.role==='viewer'?'selected':''}>Visualizador</option>
+      <option value="editor" ${u.role==='editor'?'selected':''}>Editor</option>
+    </select>`;
+  }
+
+  document.getElementById('pageContent').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:24px">
+      <!-- Pendentes -->
+      <div>
+        <div class="section-header"><div class="section-title">⏳ Aguardando aprovação (${pending.length})</div></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${pending.length === 0
+            ? `<div style="color:var(--muted);font-size:12px;padding:8px">Nenhum usuário pendente.</div>`
+            : pending.map(u => userCard(u,
+                `<button class="btn btn-success btn-sm" onclick="approveUser('${u.uid}')">✓ Aprovar</button>
+                 <button class="btn btn-danger btn-sm" onclick="blockUser('${u.uid}')">✕ Rejeitar</button>`
+              )).join('')}
+        </div>
+      </div>
+      <!-- Aprovados -->
+      <div>
+        <div class="section-header"><div class="section-title">✓ Usuários aprovados (${approved.length})</div></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${approved.length === 0
+            ? `<div style="color:var(--muted);font-size:12px;padding:8px">Nenhum usuário aprovado.</div>`
+            : approved.map(u => {
+                const isMe = u.email === ADMIN_EMAIL;
+                return `<div class="user-card" style="flex-direction:column;align-items:flex-start">
+                  <div style="display:flex;align-items:center;gap:14px;width:100%">
+                    <img class="user-avatar" src="${u.photoURL||''}" onerror="this.style.display='none'">
+                    <div style="flex:1">
+                      <div style="font-weight:600;font-size:13px">${u.name||'—'}</div>
+                      <div style="font-size:11px;color:var(--muted)">${u.email}</div>
+                    </div>
+                    ${isMe
+                      ? `<span style="font-size:11px;color:var(--muted);padding:4px 8px;background:var(--yellow-lt);border-radius:10px">Admin principal</span>`
+                      : `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+                           ${roleSelect(u)}
+                           <button class="btn btn-danger btn-sm" onclick="blockUser('${u.uid}')">Bloquear</button>
+                         </div>`}
+                  </div>
+                  ${!isMe ? permChecks(u) : ''}
+                </div>`;
+              }).join('')}
+        </div>
+      </div>
+      <!-- Bloqueados -->
+      <div>
+        <div class="section-header"><div class="section-title">🚫 Bloqueados (${blocked.length})</div></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${blocked.length === 0
+            ? `<div style="color:var(--muted);font-size:12px;padding:8px">Nenhum usuário bloqueado.</div>`
+            : blocked.map(u => userCard(u,
+                `<button class="btn btn-sm" onclick="approveUser('${u.uid}')">↺ Reativar</button>`
+              )).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function approveUser(uid) {
+  await db.collection('mad_users').doc(uid).update({ status: 'approved' });
+  toast('Usuário aprovado!', 'success');
+  renderAdmin();
+}
+async function blockUser(uid) {
+  await db.collection('mad_users').doc(uid).update({ status: 'blocked' });
+  toast('Usuário bloqueado.', 'error');
+  renderAdmin();
+}
+async function setRole(uid, role) {
+  await db.collection('mad_users').doc(uid).update({ role });
+  toast('Perfil atualizado.', 'success');
+}
+async function togglePerm(uid, perm, val) {
+  await db.collection('mad_users').doc(uid).update({ [`permissions.${perm}`]: val });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IMPORTAR EXCEL
+// ═══════════════════════════════════════════════════════════════
+function renderImportar() {
+  document.getElementById('topbarActions').innerHTML = '';
+  document.getElementById('pageContent').innerHTML = `
+    <div style="max-width:640px">
+      <div style="background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px">
+        <div style="font-family:var(--font-head);font-size:14px;font-weight:700;margin-bottom:6px">📂 Importar planilha Excel</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px">
+          Selecione o arquivo <strong>LORS Madeiras.xlsx</strong>. O sistema irá importar as abas
+          <em>Entradas</em>, <em>Saídas</em>, <em>Pagamentos</em> e <em>Recebimentos</em>.
+          Registros duplicados (mesma data + fornecedor/destino + volume) são ignorados automaticamente.
+        </div>
+        <div class="import-zone" onclick="document.getElementById('fileXlsx').click()">
+          <div class="import-zone-icon">📊</div>
+          <div class="import-zone-label">Clique para selecionar o arquivo Excel</div>
+          <div class="import-zone-sub">Formatos aceitos: .xlsx, .xls</div>
+        </div>
+        <input type="file" id="fileXlsx" accept=".xlsx,.xls" style="display:none" onchange="importarExcel(this)">
+      </div>
+      <div id="importLog" style="display:none;background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:20px">
+        <div style="font-family:var(--font-head);font-size:14px;font-weight:700;margin-bottom:12px">Resultado da importação</div>
+        <div id="importLogContent"></div>
+      </div>
+    </div>
+  `;
+}
+
+async function importarExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const logDiv     = document.getElementById('importLog');
+  const logContent = document.getElementById('importLogContent');
+  logDiv.style.display = 'block';
+  logContent.innerHTML = '<div style="color:var(--muted)">Lendo arquivo…</div>';
+
+  const buffer = await file.arrayBuffer();
+  const wb     = XLSX.read(buffer, { type: 'array', cellDates: true });
+
+  const results = [];
+
+  // ── Entradas ──
+  if (wb.SheetNames.includes('Entradas')) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets['Entradas'], { defval: '' });
+    let imp = 0, skip = 0;
+    for (const r of rows) {
+      const data = excelDate(r['Data']);
+      const forn = String(r['Nome Fornecedor Madeira']||'').trim();
+      const vol  = parseFloat(r['Volume (Ton)']||r['Volume (ton)']) || 0;
+      if (!data || !forn || !vol) { skip++; continue; }
+      // Deduplicação
+      const existe = entradas.some(e => e.data === data && e.fornecedor === forn && e.volume === vol);
+      if (existe) { skip++; continue; }
+      const espRaw = String(r['Espécie']||r['Especie']||'').toLowerCase();
+      const especie = espRaw.includes('eucal') ? 'eucalipto' : espRaw.includes('pin') ? 'pinus' : 'outro';
+      const claRaw  = String(r['Classe']||'').toLowerCase();
+      const classe  = claRaw.includes('proc') ? 'processo' : claRaw.includes('tor') ? 'toras' : claRaw.includes('cav') ? 'cavacos' : 'outro';
+      const madTon  = parseFloat(r['Valor Madeira (R$/ton)']||r['Valor Madeira (R$/Ton)']) || 0;
+      const colTon  = parseFloat(r['Valor Colheita/Carregamento (R$/ton)']||r['Valor Colheita/Carregamento (R$/Ton)']) || 0;
+      const trbTon  = parseFloat(r['Valor Transbordo (R$/ton)']||r['Valor Transbordo (R$/Ton)']) || 0;
+      const temTrb  = trbTon > 0;
+      await db.collection(COL_ENTRADAS).add({
+        data, fornecedor: forn, especie, especieObs: '', classe, classeObs: '',
+        volume: vol, unidade: 'ton',
+        valMadeiraTon: madTon, valMadeiraTotal: vol * madTon,
+        prestColheita: String(r['Nome Prestador Colheita/Carregamento']||'').trim(),
+        valColheitaTon: colTon, valColheitaTotal: vol * colTon,
+        temTransbordo: temTrb,
+        prestTransbordo: temTrb ? String(r['Nome Prestador Transbordo']||'').trim() : '',
+        valTransbordoTon: trbTon, valTransbordoTotal: vol * trbTon,
+        totalValor: vol * (madTon + colTon + trbTon),
+        obs: '', criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      imp++;
+    }
+    results.push({ aba: 'Entradas', imp, skip });
+  }
+
+  // ── Saídas ──
+  if (wb.SheetNames.includes('Saídas') || wb.SheetNames.includes('Saidas')) {
+    const sheetName = wb.SheetNames.includes('Saídas') ? 'Saídas' : 'Saidas';
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' });
+    let imp = 0, skip = 0;
+    for (const r of rows) {
+      const data    = excelDate(r['Data carregamento']||r['Data']);
+      const destino = String(r['Destino']||'').trim();
+      const vol     = parseFloat(r['Volume (ton)']||r['Volume (Ton)']) || 0;
+      if (!data || !destino || !vol) { skip++; continue; }
+      const existe = saidas.some(s => s.data === data && s.destino === destino && s.volume === vol);
+      if (existe) { skip++; continue; }
+      const espRaw  = String(r['Espécie']||r['Especie']||'').toLowerCase();
+      const especie = espRaw.includes('eucal') ? 'eucalipto' : espRaw.includes('pin') ? 'pinus' : 'outro';
+      const claRaw  = String(r['Classe']||'').toLowerCase();
+      const classe  = claRaw.includes('proc') ? 'processo' : claRaw.includes('tor') ? 'toras' : claRaw.includes('cav') ? 'cavacos' : 'outro';
+      const madTon  = parseFloat(r['Valor Madeira (R$/ton)']||r['Valor Madeira (R$/Ton)']) || 0;
+      const frtTon  = parseFloat(r['Valor  Frete (R$/ton)']||r['Valor Frete (R$/ton)']||r['Valor Frete (R$/Ton)']) || 0;
+      await db.collection(COL_SAIDAS).add({
+        data, caminhao: String(r['Caminhão Transporte']||r['Caminhao Transporte']||'').trim(),
+        especie, especieObs: '', classe, classeObs: '',
+        volume: vol, unidade: 'ton', destino,
+        valMadeiraTon: madTon, valMadeiraTotal: vol * madTon,
+        valFreteTon: frtTon, valFreteTotal: vol * frtTon,
+        totalReceita: vol * (madTon + frtTon),
+        emitente: '', nfNumero: '', obs: '',
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      imp++;
+    }
+    results.push({ aba: 'Saídas', imp, skip });
+  }
+
+  // ── Pagamentos ──
+  if (wb.SheetNames.includes('Pagamentos')) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets['Pagamentos'], { defval: '' });
+    let imp = 0, skip = 0;
+    for (const r of rows) {
+      const data     = excelDate(r['Data']);
+      const parceiro = String(r['Parceiro']||'').trim();
+      const valor    = parseFloat(r['Valor']) || 0;
+      if (!data || !parceiro || !valor) { skip++; continue; }
+      const existe = pagamentos.some(p => p.data === data && p.parceiro === parceiro && p.valor === valor);
+      if (existe) { skip++; continue; }
+      await db.collection(COL_PAGAMENTOS).add({
+        data, parceiro, valor,
+        referencia: String(r['Referência']||r['Referencia']||'').trim(),
+        status: 'pago', obs: '',
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      imp++;
+    }
+    results.push({ aba: 'Pagamentos', imp, skip });
+  }
+
+  // ── Recebimentos ──
+  if (wb.SheetNames.includes('Recebimentos')) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets['Recebimentos'], { defval: '' });
+    let imp = 0, skip = 0;
+    for (const r of rows) {
+      const data     = excelDate(r['Data']);
+      const parceiro = String(r['Parceiro']||'').trim();
+      const valor    = parseFloat(r['Valor']) || 0;
+      if (!data || !parceiro || !valor) { skip++; continue; }
+      const existe = recebimentos.some(rc => rc.data === data && rc.parceiro === parceiro && rc.valor === valor);
+      if (existe) { skip++; continue; }
+      await db.collection(COL_RECEBIMENTOS).add({
+        data, parceiro, valor,
+        referencia: String(r['Referência']||r['Referencia']||'').trim(),
+        status: 'recebido', obs: '',
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      imp++;
+    }
+    results.push({ aba: 'Recebimentos', imp, skip });
+  }
+
+  logContent.innerHTML = results.map(r => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-weight:600">${r.aba}</div>
+        <div style="font-size:11px;color:var(--muted)">${r.skip} ignorado${r.skip!==1?'s':''} (duplicado/incompleto)</div>
+      </div>
+      <div style="font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--green)">+${r.imp} importado${r.imp!==1?'s':''}</div>
+    </div>
+  `).join('') + `<div style="margin-top:12px;font-size:12px;color:var(--muted)">Importação concluída. Os dados já estão disponíveis no sistema.</div>`;
+  toast('Importação concluída!', 'success');
+  input.value = '';
+}
+
+function excelDate(val) {
+  if (!val) return '';
+  if (val instanceof Date) return val.toISOString().slice(0,10);
+  if (typeof val === 'number') {
+    // Serial Excel → Date
+    const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    return d.toISOString().slice(0,10);
+  }
+  if (typeof val === 'string') {
+    // dd/mm/yyyy
+    const m = val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+    // yyyy-mm-dd
+    if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0,10);
+  }
+  return '';
+}
 </script>
 </body>
 </html>
