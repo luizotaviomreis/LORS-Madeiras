@@ -2314,11 +2314,26 @@ function excelDate(val) {
 }
 
 function xlFrete(r) {
-  // Trata "Valor  Frete" com 1 ou 2 espaços
+  // Trata "Valor  Frete" com qualquer quantidade de espaços internos
   for (const k of Object.keys(r)) {
-    if (k.replace(/\s+/g,' ').trim() === 'Valor Frete (R$/ton)') return parseFloat(r[k]) || 0;
+    if (k.replace(/\s+/g, ' ').trim() === 'Valor Frete (R$/ton)') return parseFloat(r[k]) || 0;
   }
   return 0;
+}
+
+function xlGet(r, ...keys) {
+  // Busca chave ignorando espaços extras e maiúsculas
+  for (const k of keys) {
+    if (r[k] !== undefined && r[k] !== '') return r[k];
+  }
+  // fallback: busca normalizada
+  const norm = k => k.replace(/\s+/g,' ').trim().toLowerCase();
+  for (const rk of Object.keys(r)) {
+    for (const k of keys) {
+      if (norm(rk) === norm(k) && r[rk] !== '') return r[rk];
+    }
+  }
+  return '';
 }
 
 function xlEspecie(r) {
@@ -2335,9 +2350,31 @@ function lerWorkbook(buffer) {
   return XLSX.read(buffer, { type: 'array', cellDates: false });
 }
 
+// Encontra a linha de cabeçalho automaticamente (ignora linhas em branco no topo)
 function xlSheetRows(wb, ...names) {
   for (const n of names) {
-    if (wb.SheetNames.includes(n)) return XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '' });
+    if (!wb.SheetNames.includes(n)) continue;
+    const ws = wb.Sheets[n];
+    // Pega todas as linhas como arrays
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    // Encontra a primeira linha com pelo menos 3 células não-vazias (o cabeçalho)
+    let headerIdx = -1;
+    for (let i = 0; i < raw.length; i++) {
+      const filled = raw[i].filter(c => String(c).trim() !== '').length;
+      if (filled >= 3) { headerIdx = i; break; }
+    }
+    if (headerIdx === -1) return [];
+    const headers = raw[headerIdx].map(h => String(h).trim());
+    const rows = [];
+    for (let i = headerIdx + 1; i < raw.length; i++) {
+      const row = raw[i];
+      // Ignora linhas totalmente vazias
+      if (row.every(c => String(c).trim() === '')) continue;
+      const obj = {};
+      headers.forEach((h, j) => { obj[h] = row[j] !== undefined ? row[j] : ''; });
+      rows.push(obj);
+    }
+    return rows;
   }
   return [];
 }
