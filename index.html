@@ -1,0 +1,1868 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>LORS Madeiras — Gestão</title>
+<meta name="theme-color" content="#1a4d2e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="LORS Madeiras">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+:root {
+  --ink: #0f0e11;
+  --paper: #f5f3ee;
+  --paper2: #edeae3;
+  --accent: #1a4d2e;
+  --accent2: #2e7d4f;
+  --green: #1a6b45;
+  --green-lt: #e8f5ef;
+  --red: #b72b2b;
+  --red-lt: #fdeaea;
+  --yellow: #e8a020;
+  --yellow-lt: #fef8ec;
+  --blue-lt: #eef2fb;
+  --border: #d4cfc5;
+  --muted: #7a7570;
+  --shadow: 0 2px 12px rgba(15,14,17,.08);
+  --r: 6px;
+  --font-head: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.app { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: 220px;
+  min-height: 100vh;
+  background: #0f1f15;
+  color: var(--paper);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  flex-shrink: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.logo {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.logo-main {
+  font-family: var(--font-head);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -.5px;
+  color: #fff;
+  line-height: 1.1;
+}
+.logo-tag {
+  display: inline-block;
+  background: #2e7d4f;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 99px;
+  margin-top: 5px;
+}
+
+.nav { padding: 16px 0; flex: 1; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgba(255,255,255,.55);
+  border-left: 2px solid transparent;
+  transition: all .15s;
+  user-select: none;
+}
+.nav-item:hover { color: #fff; background: rgba(255,255,255,.06); }
+.nav-item.active { color: #fff; border-left-color: #4ade80; background: rgba(255,255,255,.08); }
+.nav-icon { width: 18px; text-align: center; font-size: 15px; }
+
+.nav-section {
+  padding: 14px 20px 6px;
+  font-size: 9px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.25);
+}
+
+.nav-foot {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  font-size: 11px;
+  color: rgba(255,255,255,.35);
+}
+.nav-foot strong { display: block; color: rgba(255,255,255,.6); font-weight: 500; margin-bottom: 6px; }
+.nav-foot a { color: rgba(255,255,255,.35); cursor: pointer; text-decoration: underline; }
+
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.topbar {
+  background: var(--paper);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.page-title {
+  font-family: var(--font-head);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -.4px;
+}
+.page-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--r);
+  border: 1.5px solid var(--border);
+  background: #fff;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  transition: all .15s;
+}
+.btn:hover { border-color: var(--ink); }
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { background: #133d24; }
+.btn-success {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+.btn-success:hover { background: #145437; }
+.btn-danger { color: var(--red); border-color: var(--red-lt); }
+.btn-danger:hover { background: var(--red-lt); }
+.btn-sm { padding: 5px 10px; font-size: 11px; }
+.btn-icon { padding: 5px 8px; }
+
+.content { padding: 24px 28px; flex: 1; }
+
+/* ── Cards ── */
+.cards-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px;
+}
+.card-label { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.card-value { font-family: var(--font-head); font-size: 22px; font-weight: 700; line-height: 1.1; }
+.card-value.pos { color: var(--green); }
+.card-value.neg { color: var(--red); }
+.card-value.neu { color: var(--accent); }
+.card-delta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* ── Section header ── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.section-title {
+  font-family: var(--font-head);
+  font-size: 15px;
+  font-weight: 600;
+}
+.section-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ── Filtros ── */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.filter-select {
+  padding: 6px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r);
+  background: #fff;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.filter-input {
+  padding: 6px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r);
+  background: #fff;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  min-width: 130px;
+}
+
+/* ── Tabela ── */
+.table-wrap {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow-x: auto;
+}
+table { width: 100%; border-collapse: collapse; min-width: 600px; }
+thead th {
+  background: var(--paper2);
+  padding: 9px 12px;
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  white-space: nowrap;
+}
+thead th.r { text-align: right; }
+tbody tr { border-bottom: 1px solid #f0ede8; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: #faf9f7; }
+tbody td { padding: 9px 12px; font-size: 12px; vertical-align: middle; }
+tbody td.r { text-align: right; font-variant-numeric: tabular-nums; }
+.valor-pos { color: var(--green); font-weight: 500; }
+.valor-neg { color: var(--red); font-weight: 500; }
+.valor-neu { color: var(--accent); font-weight: 500; }
+
+.empty-row td { text-align: center; color: var(--muted); padding: 32px; font-size: 13px; }
+
+/* ── Badges ── */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+.badge-eucalipto { background: #e8f5ef; color: #1a6b45; }
+.badge-pinus     { background: #fef8ec; color: #92400e; }
+.badge-outro     { background: var(--paper2); color: var(--muted); }
+.badge-processo  { background: #eef2fb; color: #1d4ed8; }
+.badge-toras     { background: #fde8e0; color: #a03010; }
+.badge-cavacos   { background: #f3f0ff; color: #5b21b6; }
+.badge-pago      { background: var(--green-lt); color: var(--green); }
+.badge-pendente  { background: var(--yellow-lt); color: #92400e; }
+.badge-recebido  { background: var(--green-lt); color: var(--green); }
+.badge-cancelado { background: var(--red-lt); color: var(--red); }
+
+/* ── Modal ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15,14,17,.55);
+  z-index: 100;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 24px 12px;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: #fff;
+  border-radius: 10px;
+  padding: 28px;
+  width: 600px;
+  max-width: 95vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  animation: slideUp .2s ease;
+  margin: auto;
+}
+.modal.modal-sm { width: 460px; }
+@keyframes slideUp { from { opacity:0; transform:translateY(16px); } }
+.modal-title {
+  font-family: var(--font-head);
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-close { cursor: pointer; color: var(--muted); font-size: 20px; line-height: 1; }
+.modal-close:hover { color: var(--ink); }
+
+/* ── Form ── */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-grid.single { grid-template-columns: 1fr; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group.span2 { grid-column: span 2; }
+label { font-size: 11px; color: var(--muted); letter-spacing: .04em; }
+input, select, textarea {
+  padding: 8px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink);
+  background: #fff;
+  transition: border-color .15s;
+  width: 100%;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+textarea { resize: vertical; min-height: 60px; }
+
+.form-section {
+  background: #f8f7f5;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.form-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink);
+  user-select: none;
+}
+input[type="checkbox"] { width: auto; cursor: pointer; }
+
+.calc-preview {
+  background: var(--green-lt);
+  border: 1px solid #b7dfc8;
+  border-radius: var(--r);
+  padding: 10px 14px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.calc-preview-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+.calc-preview-value { font-family: var(--font-head); font-size: 20px; font-weight: 700; color: var(--green); }
+.calc-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.modal-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Auth ── */
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0f1f15;
+}
+.auth-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 40px 36px;
+  width: 380px;
+  max-width: 92vw;
+  box-shadow: 0 24px 64px rgba(0,0,0,.3);
+}
+.auth-logo {
+  font-family: var(--font-head);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.auth-sub { font-size: 12px; color: var(--muted); margin-bottom: 28px; }
+.auth-box input {
+  margin-bottom: 12px;
+  display: block;
+}
+.auth-error { color: var(--red); font-size: 12px; margin-top: 8px; min-height: 18px; }
+
+/* ── Toast ── */
+.toast-area { position: fixed; bottom: 24px; right: 24px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  background: var(--ink);
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: var(--r);
+  font-size: 13px;
+  animation: toastIn .2s ease;
+  max-width: 320px;
+}
+.toast.success { background: var(--green); }
+.toast.error   { background: var(--red); }
+@keyframes toastIn { from { opacity:0; transform:translateX(20px); } }
+
+/* ── Totals row ── */
+.table-total {
+  background: var(--paper2);
+  border-top: 2px solid var(--border);
+}
+.table-total td {
+  font-weight: 600;
+  font-size: 12px;
+  padding: 10px 12px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .content { padding: 16px; }
+  .topbar { padding: 12px 16px; }
+  .cards-row { grid-template-columns: 1fr 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+  .form-group.span2 { grid-column: span 1; }
+}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="authScreen" class="auth-screen" style="display:none">
+  <div class="auth-box">
+    <div class="auth-logo">🌲 LORS Madeiras</div>
+    <div class="auth-sub">Sistema de gestão de madeira própria</div>
+    <input type="email" id="authEmail" placeholder="E-mail" />
+    <input type="password" id="authPass" placeholder="Senha" />
+    <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="signIn()">Entrar</button>
+    <div class="auth-error" id="authErr"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appShell" class="app" style="display:none">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-main">🌲 LORS<br>Madeiras</div>
+      <span class="logo-tag">Madeira Própria</span>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Visão Geral</div>
+      <div class="nav-item active" onclick="navTo('dashboard')">
+        <span class="nav-icon">📊</span> Dashboard
+      </div>
+      <div class="nav-section">Operações</div>
+      <div class="nav-item" onclick="navTo('entradas')">
+        <span class="nav-icon">📥</span> Entradas
+      </div>
+      <div class="nav-item" onclick="navTo('saidas')">
+        <span class="nav-icon">📤</span> Saídas
+      </div>
+      <div class="nav-section">Financeiro</div>
+      <div class="nav-item" onclick="navTo('pagamentos')">
+        <span class="nav-icon">💸</span> Pagamentos
+      </div>
+      <div class="nav-item" onclick="navTo('recebimentos')">
+        <span class="nav-icon">💰</span> Recebimentos
+      </div>
+    </nav>
+    <div class="nav-foot">
+      <strong id="navUserEmail"></strong>
+      <a onclick="signOut()">Sair</a>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title" id="pageTitle">Dashboard</div>
+        <div class="page-sub" id="pageSub">Visão geral das operações</div>
+      </div>
+      <div id="topbarActions"></div>
+    </div>
+    <div class="content" id="pageContent"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-area" id="toastArea"></div>
+
+<!-- MODAL ENTRADA -->
+<div class="modal-overlay" id="modalEntrada">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="modalEntradaTitulo">Nova Entrada</span>
+      <span class="modal-close" onclick="closeModal('modalEntrada')">×</span>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">📋 Identificação</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Data *</label>
+          <input type="date" id="eData">
+        </div>
+        <div class="form-group">
+          <label>Fornecedor *</label>
+          <input type="text" id="eFornecedor" placeholder="Nome da fazenda/fornecedor">
+        </div>
+        <div class="form-group">
+          <label>Espécie *</label>
+          <select id="eEspecie" onchange="toggleEspecieObs()">
+            <option value="">Selecione…</option>
+            <option value="eucalipto">Eucalipto</option>
+            <option value="pinus">Pinus</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="form-group" id="eEspecieObsGroup" style="display:none">
+          <label>Qual espécie?</label>
+          <input type="text" id="eEspecieObs" placeholder="Descreva a espécie">
+        </div>
+        <div class="form-group">
+          <label>Classe *</label>
+          <select id="eClasse" onchange="toggleClasseObs()">
+            <option value="">Selecione…</option>
+            <option value="processo">Processo</option>
+            <option value="toras">Toras</option>
+            <option value="cavacos">Cavacos</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="form-group" id="eClasseObsGroup" style="display:none">
+          <label>Qual classe?</label>
+          <input type="text" id="eClasseObs" placeholder="Descreva a classe">
+        </div>
+        <div class="form-group">
+          <label>Volume (ton) *</label>
+          <input type="number" id="eVolume" placeholder="0,00" step="0.01" min="0" oninput="calcEntrada()">
+        </div>
+        <div class="form-group">
+          <label>Unidade</label>
+          <select id="eUnidade">
+            <option value="ton">Toneladas (ton)</option>
+            <option value="m3">Metros cúbicos (m³)</option>
+            <option value="st">Esteres (st)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">🌳 Madeira (custo de aquisição)</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Valor Madeira (R$/ton) *</label>
+          <input type="number" id="eValMadeiraTon" placeholder="0,00" step="0.01" min="0" oninput="calcEntrada()">
+        </div>
+        <div class="form-group">
+          <label>Total Madeira (R$)</label>
+          <input type="text" id="eValMadeiraTotal" readonly style="background:#f8f7f5;color:var(--muted)">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">🪚 Colheita / Carregamento</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Prestador</label>
+          <input type="text" id="ePrestColheita" placeholder="Nome do prestador">
+        </div>
+        <div class="form-group">
+          <label>Valor Colheita/Carreg. (R$/ton)</label>
+          <input type="number" id="eValColheitaTon" placeholder="0,00" step="0.01" min="0" oninput="calcEntrada()">
+        </div>
+        <div class="form-group">
+          <label>Total Colheita/Carreg. (R$)</label>
+          <input type="text" id="eValColheitaTotal" readonly style="background:#f8f7f5;color:var(--muted)">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">
+        <label class="form-toggle">
+          <input type="checkbox" id="eTemTransbordo" onchange="toggleTransbordo()"> Transbordo
+        </label>
+      </div>
+      <div id="eTransbordoFields" style="display:none">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Prestador Transbordo</label>
+            <input type="text" id="ePrestTransbordo" placeholder="Nome do prestador">
+          </div>
+          <div class="form-group">
+            <label>Valor Transbordo (R$/ton)</label>
+            <input type="number" id="eValTransbordoTon" placeholder="0,00" step="0.01" min="0" oninput="calcEntrada()">
+          </div>
+          <div class="form-group">
+            <label>Total Transbordo (R$)</label>
+            <input type="text" id="eValTransbordoTotal" readonly style="background:#f8f7f5;color:var(--muted)">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">📝 Observações</div>
+      <div class="form-group">
+        <textarea id="eObs" placeholder="Observações opcionais…" rows="2"></textarea>
+      </div>
+    </div>
+
+    <div class="calc-preview" id="eCalcPreview">
+      <div class="calc-preview-label">Custo Total da Entrada</div>
+      <div class="calc-preview-value" id="eCalcTotal">R$ 0,00</div>
+      <div id="eCalcBreakdown"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modalEntrada')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveEntrada()">Salvar Entrada</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SAIDA -->
+<div class="modal-overlay" id="modalSaida">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="modalSaidaTitulo">Nova Saída</span>
+      <span class="modal-close" onclick="closeModal('modalSaida')">×</span>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">📋 Identificação</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Data *</label>
+          <input type="date" id="sData">
+        </div>
+        <div class="form-group">
+          <label>Caminhão *</label>
+          <input type="text" id="sCaminhao" placeholder="Ex: LORS-01">
+        </div>
+        <div class="form-group">
+          <label>Espécie *</label>
+          <select id="sEspecie" onchange="toggleSaidaEspecieObs()">
+            <option value="">Selecione…</option>
+            <option value="eucalipto">Eucalipto</option>
+            <option value="pinus">Pinus</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="form-group" id="sEspecieObsGroup" style="display:none">
+          <label>Qual espécie?</label>
+          <input type="text" id="sEspecieObs">
+        </div>
+        <div class="form-group">
+          <label>Classe *</label>
+          <select id="sClasse" onchange="toggleSaidaClasseObs()">
+            <option value="">Selecione…</option>
+            <option value="processo">Processo</option>
+            <option value="toras">Toras</option>
+            <option value="cavacos">Cavacos</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="form-group" id="sClasseObsGroup" style="display:none">
+          <label>Qual classe?</label>
+          <input type="text" id="sClasseObs">
+        </div>
+        <div class="form-group">
+          <label>Volume (ton) *</label>
+          <input type="number" id="sVolume" placeholder="0,00" step="0.01" min="0" oninput="calcSaida()">
+        </div>
+        <div class="form-group">
+          <label>Unidade</label>
+          <select id="sUnidade">
+            <option value="ton">Toneladas (ton)</option>
+            <option value="m3">Metros cúbicos (m³)</option>
+            <option value="st">Esteres (st)</option>
+          </select>
+        </div>
+        <div class="form-group span2">
+          <label>Destino / Cliente *</label>
+          <input type="text" id="sDestino" placeholder="Ex: Klabin / Dissenha">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">💵 Faturamento</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Valor Madeira (R$/ton) *</label>
+          <input type="number" id="sValMadeiraTon" placeholder="0,00" step="0.01" min="0" oninput="calcSaida()">
+        </div>
+        <div class="form-group">
+          <label>Receita Madeira (R$)</label>
+          <input type="text" id="sValMadeiraTotal" readonly style="background:#f8f7f5;color:var(--muted)">
+        </div>
+        <div class="form-group">
+          <label>Valor Frete (R$/ton)</label>
+          <input type="number" id="sValFreteTon" placeholder="0,00" step="0.01" min="0" oninput="calcSaida()">
+        </div>
+        <div class="form-group">
+          <label>Receita Frete (R$)</label>
+          <input type="text" id="sValFreteTotal" readonly style="background:#f8f7f5;color:var(--muted)">
+        </div>
+        <div class="form-group">
+          <label>Emitente NF</label>
+          <input type="text" id="sEmitente" placeholder="Empresa emissora">
+        </div>
+        <div class="form-group">
+          <label>Nº NF</label>
+          <input type="text" id="sNfNumero" placeholder="000000">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">📝 Observações</div>
+      <div class="form-group">
+        <textarea id="sObs" placeholder="Observações opcionais…" rows="2"></textarea>
+      </div>
+    </div>
+
+    <div class="calc-preview" id="sCalcPreview" style="background: #e8f5ef; border-color: #b7dfc8;">
+      <div class="calc-preview-label">Receita Total da Saída</div>
+      <div class="calc-preview-value" id="sCalcTotal">R$ 0,00</div>
+      <div id="sCalcBreakdown"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modalSaida')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveSaida()">Salvar Saída</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PAGAMENTO -->
+<div class="modal-overlay" id="modalPagamento">
+  <div class="modal modal-sm">
+    <div class="modal-title">
+      <span id="modalPagTitulo">Novo Pagamento</span>
+      <span class="modal-close" onclick="closeModal('modalPagamento')">×</span>
+    </div>
+    <div class="form-grid single">
+      <div class="form-group">
+        <label>Data *</label>
+        <input type="date" id="pData">
+      </div>
+      <div class="form-group">
+        <label>Parceiro / Fornecedor *</label>
+        <input type="text" id="pParceiro" placeholder="Nome">
+      </div>
+      <div class="form-group">
+        <label>Valor (R$) *</label>
+        <input type="number" id="pValor" placeholder="0,00" step="0.01" min="0">
+      </div>
+      <div class="form-group">
+        <label>Referência</label>
+        <input type="text" id="pReferencia" placeholder="Ex: 21,66ton eucalipto">
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="pStatus">
+          <option value="pendente">Pendente</option>
+          <option value="pago">Pago</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Observações</label>
+        <textarea id="pObs" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modalPagamento')">Cancelar</button>
+      <button class="btn btn-primary" onclick="savePagamento()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RECEBIMENTO -->
+<div class="modal-overlay" id="modalRecebimento">
+  <div class="modal modal-sm">
+    <div class="modal-title">
+      <span id="modalRecTitulo">Novo Recebimento</span>
+      <span class="modal-close" onclick="closeModal('modalRecebimento')">×</span>
+    </div>
+    <div class="form-grid single">
+      <div class="form-group">
+        <label>Data *</label>
+        <input type="date" id="rData">
+      </div>
+      <div class="form-group">
+        <label>Parceiro / Cliente *</label>
+        <input type="text" id="rParceiro" placeholder="Nome">
+      </div>
+      <div class="form-group">
+        <label>Valor (R$) *</label>
+        <input type="number" id="rValor" placeholder="0,00" step="0.01" min="0">
+      </div>
+      <div class="form-group">
+        <label>Referência</label>
+        <input type="text" id="rReferencia" placeholder="Ex: NF 000123">
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="rStatus">
+          <option value="pendente">Pendente</option>
+          <option value="recebido">Recebido</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Observações</label>
+        <textarea id="rObs" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modalRecebimento')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRecebimento()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMAR EXCLUSÃO -->
+<div class="modal-overlay" id="modalDel">
+  <div class="modal modal-sm">
+    <div class="modal-title">
+      <span>Confirmar exclusão</span>
+      <span class="modal-close" onclick="closeModal('modalDel')">×</span>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:20px">Tem certeza que deseja excluir este registro? Esta ação não pode ser desfeita.</p>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modalDel')">Cancelar</button>
+      <button class="btn btn-danger" id="btnDelConfirm">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// FIREBASE
+// ═══════════════════════════════════════════════════════════════
+const ADMIN_EMAIL = 'luizotaviomreis@gmail.com';
+
+firebase.initializeApp({
+  apiKey: "AIzaSyBS-5KmteYrFMyGpdiJR95qu2smdhOIaFo",
+  authDomain: "lors-transportes.firebaseapp.com",
+  projectId: "lors-transportes",
+  storageBucket: "lors-transportes.firebasestorage.app",
+  messagingSenderId: "154122701067",
+  appId: "1:154122701067:web:1e63fd0630a0fa8551ba0e"
+});
+
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+// Collections prefixed com mad_ para não conflitar com LORS financeiro
+const COL_ENTRADAS     = 'mad_entradas';
+const COL_SAIDAS       = 'mad_saidas';
+const COL_PAGAMENTOS   = 'mad_pagamentos';
+const COL_RECEBIMENTOS = 'mad_recebimentos';
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let currentPage = 'dashboard';
+let entradas = [], saidas = [], pagamentos = [], recebimentos = [];
+let editingId = null;
+let unsubs = [];
+
+// ═══════════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════════
+auth.onAuthStateChanged(user => {
+  if (user) {
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appShell').style.display  = 'flex';
+    document.getElementById('navUserEmail').textContent = user.email;
+    startListeners();
+    navTo('dashboard');
+  } else {
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('appShell').style.display  = 'none';
+    unsubs.forEach(u => u());
+    unsubs = [];
+  }
+});
+
+function signIn() {
+  const email = document.getElementById('authEmail').value.trim();
+  const pass  = document.getElementById('authPass').value;
+  document.getElementById('authErr').textContent = '';
+  auth.signInWithEmailAndPassword(email, pass)
+    .catch(e => { document.getElementById('authErr').textContent = 'E-mail ou senha inválidos.'; });
+}
+document.getElementById('authPass').addEventListener('keydown', e => { if (e.key === 'Enter') signIn(); });
+
+function signOut() { auth.signOut(); }
+
+// ═══════════════════════════════════════════════════════════════
+// REALTIME LISTENERS
+// ═══════════════════════════════════════════════════════════════
+function startListeners() {
+  unsubs.push(
+    db.collection(COL_ENTRADAS).orderBy('data','desc').onSnapshot(s => {
+      entradas = s.docs.map(d => ({id: d.id, ...d.data()}));
+      if (currentPage === 'entradas') renderEntradas();
+      if (currentPage === 'dashboard') renderDashboard();
+    })
+  );
+  unsubs.push(
+    db.collection(COL_SAIDAS).orderBy('data','desc').onSnapshot(s => {
+      saidas = s.docs.map(d => ({id: d.id, ...d.data()}));
+      if (currentPage === 'saidas') renderSaidas();
+      if (currentPage === 'dashboard') renderDashboard();
+    })
+  );
+  unsubs.push(
+    db.collection(COL_PAGAMENTOS).orderBy('data','desc').onSnapshot(s => {
+      pagamentos = s.docs.map(d => ({id: d.id, ...d.data()}));
+      if (currentPage === 'pagamentos') renderPagamentos();
+      if (currentPage === 'dashboard') renderDashboard();
+    })
+  );
+  unsubs.push(
+    db.collection(COL_RECEBIMENTOS).orderBy('data','desc').onSnapshot(s => {
+      recebimentos = s.docs.map(d => ({id: d.id, ...d.data()}));
+      if (currentPage === 'recebimentos') renderRecebimentos();
+      if (currentPage === 'dashboard') renderDashboard();
+    })
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+const pages = {
+  dashboard:    { title: 'Dashboard',    sub: 'Visão geral das operações' },
+  entradas:     { title: 'Entradas',     sub: 'Compras e custos de aquisição de madeira' },
+  saidas:       { title: 'Saídas',       sub: 'Vendas e faturamento de cargas' },
+  pagamentos:   { title: 'Pagamentos',   sub: 'Controle de pagamentos a fornecedores' },
+  recebimentos: { title: 'Recebimentos', sub: 'Controle de recebimentos de clientes' },
+};
+
+function navTo(page) {
+  currentPage = page;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el => {
+    if (el.getAttribute('onclick') === `navTo('${page}')`) el.classList.add('active');
+  });
+  document.getElementById('pageTitle').textContent = pages[page].title;
+  document.getElementById('pageSub').textContent   = pages[page].sub;
+  const acts = document.getElementById('topbarActions');
+  acts.innerHTML = '';
+  const renders = {
+    dashboard:    renderDashboard,
+    entradas:     renderEntradas,
+    saidas:       renderSaidas,
+    pagamentos:   renderPagamentos,
+    recebimentos: renderRecebimentos,
+  };
+  renders[page]();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+function fmt(v) {
+  return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function fmtTon(v) {
+  return Number(v || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' ton';
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+function today() {
+  return new Date().toISOString().slice(0,10);
+}
+function especieLabel(e, obs) {
+  if (!e) return '—';
+  if (e === 'eucalipto') return 'Eucalipto';
+  if (e === 'pinus')     return 'Pinus';
+  return obs || e;
+}
+function classeLabel(c, obs) {
+  if (!c) return '—';
+  if (c === 'processo') return 'Processo';
+  if (c === 'toras')    return 'Toras';
+  if (c === 'cavacos')  return 'Cavacos';
+  return obs || c;
+}
+function especieBadge(e) {
+  const cls = e === 'eucalipto' ? 'badge-eucalipto' : e === 'pinus' ? 'badge-pinus' : 'badge-outro';
+  return `<span class="badge ${cls}">${especieLabel(e)}</span>`;
+}
+function classeBadge(c) {
+  const cls = c === 'processo' ? 'badge-processo' : c === 'toras' ? 'badge-toras' : c === 'cavacos' ? 'badge-cavacos' : 'badge-outro';
+  return `<span class="badge ${cls}">${classeLabel(c)}</span>`;
+}
+function statusBadge(s) {
+  const map = { pago:'badge-pago', pendente:'badge-pendente', recebido:'badge-recebido', cancelado:'badge-cancelado' };
+  const labels = { pago:'Pago', pendente:'Pendente', recebido:'Recebido', cancelado:'Cancelado' };
+  return `<span class="badge ${map[s]||'badge-outro'}">${labels[s]||s}</span>`;
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════
+function toast(msg, type = '') {
+  const area = document.getElementById('toastArea');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  area.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+function renderDashboard() {
+  const totalCustoEntradas  = entradas.reduce((s,e) => s + (e.totalValor||0), 0);
+  const totalVolEntradas    = entradas.reduce((s,e) => s + (e.volume||0), 0);
+  const totalRecSaidas      = saidas.reduce((s,e) => s + (e.totalReceita||0), 0);
+  const totalVolSaidas      = saidas.reduce((s,e) => s + (e.volume||0), 0);
+  const resultado           = totalRecSaidas - totalCustoEntradas;
+  const totalPagar          = pagamentos.filter(p => p.status === 'pendente').reduce((s,e) => s + (e.valor||0), 0);
+  const totalReceber        = recebimentos.filter(r => r.status === 'pendente').reduce((s,e) => s + (e.valor||0), 0);
+  const totalPago           = pagamentos.filter(p => p.status === 'pago').reduce((s,e) => s + (e.valor||0), 0);
+  const totalRecebido       = recebimentos.filter(r => r.status === 'recebido').reduce((s,e) => s + (e.valor||0), 0);
+
+  // Últimas entradas
+  const ults_e = entradas.slice(0,5);
+  const ults_s = saidas.slice(0,5);
+
+  document.getElementById('pageContent').innerHTML = `
+    <div class="cards-row" style="grid-template-columns: repeat(auto-fit, minmax(150px,1fr))">
+      <div class="card">
+        <div class="card-label">Volume Entrada</div>
+        <div class="card-value neu">${fmtTon(totalVolEntradas)}</div>
+        <div class="card-delta">${entradas.length} registro${entradas.length!==1?'s':''}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Custo Total</div>
+        <div class="card-value neg">${fmt(totalCustoEntradas)}</div>
+        <div class="card-delta">aquisição + colheita</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Volume Saída</div>
+        <div class="card-value neu">${fmtTon(totalVolSaidas)}</div>
+        <div class="card-delta">${saidas.length} carga${saidas.length!==1?'s':''}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Receita Total</div>
+        <div class="card-value pos">${fmt(totalRecSaidas)}</div>
+        <div class="card-delta">madeira + frete</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Resultado Bruto</div>
+        <div class="card-value ${resultado>=0?'pos':'neg'}">${fmt(resultado)}</div>
+        <div class="card-delta">receita − custo</div>
+      </div>
+      <div class="card">
+        <div class="card-label">A Pagar</div>
+        <div class="card-value neg">${fmt(totalPagar)}</div>
+        <div class="card-delta">${fmt(totalPago)} já pago</div>
+      </div>
+      <div class="card">
+        <div class="card-label">A Receber</div>
+        <div class="card-value pos">${fmt(totalReceber)}</div>
+        <div class="card-delta">${fmt(totalRecebido)} já recebido</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;flex-wrap:wrap">
+      <div>
+        <div class="section-header">
+          <div class="section-title">Últimas Entradas</div>
+          <button class="btn btn-sm" onclick="navTo('entradas')">Ver todas →</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Data</th><th>Fornecedor</th><th>Espécie</th><th class="r">Volume</th><th class="r">Custo</th>
+            </tr></thead>
+            <tbody>
+              ${ults_e.length === 0 ? '<tr class="empty-row"><td colspan="5">Nenhuma entrada registrada</td></tr>' :
+                ults_e.map(e => `<tr>
+                  <td>${fmtDate(e.data)}</td>
+                  <td>${e.fornecedor||'—'}</td>
+                  <td>${especieBadge(e.especie)}</td>
+                  <td class="r">${fmtTon(e.volume)}</td>
+                  <td class="r valor-neg">${fmt(e.totalValor)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <div class="section-header">
+          <div class="section-title">Últimas Saídas</div>
+          <button class="btn btn-sm" onclick="navTo('saidas')">Ver todas →</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Data</th><th>Destino</th><th>Espécie</th><th class="r">Volume</th><th class="r">Receita</th>
+            </tr></thead>
+            <tbody>
+              ${ults_s.length === 0 ? '<tr class="empty-row"><td colspan="5">Nenhuma saída registrada</td></tr>' :
+                ults_s.map(s => `<tr>
+                  <td>${fmtDate(s.data)}</td>
+                  <td>${s.destino||'—'}</td>
+                  <td>${especieBadge(s.especie)}</td>
+                  <td class="r">${fmtTon(s.volume)}</td>
+                  <td class="r valor-pos">${fmt(s.totalReceita)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENTRADAS
+// ═══════════════════════════════════════════════════════════════
+function renderEntradas() {
+  document.getElementById('topbarActions').innerHTML =
+    `<button class="btn btn-primary" onclick="openModalEntrada()">＋ Nova Entrada</button>`;
+
+  const totalVol   = entradas.reduce((s,e) => s + (e.volume||0), 0);
+  const totalCusto = entradas.reduce((s,e) => s + (e.totalValor||0), 0);
+
+  document.getElementById('pageContent').innerHTML = `
+    <div class="cards-row" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card">
+        <div class="card-label">Registros</div>
+        <div class="card-value neu">${entradas.length}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Volume Total</div>
+        <div class="card-value neu">${fmtTon(totalVol)}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Custo Total</div>
+        <div class="card-value neg">${fmt(totalCusto)}</div>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <select class="filter-select" id="filtEspecie" onchange="renderEntradas()">
+        <option value="">Todas as espécies</option>
+        <option value="eucalipto">Eucalipto</option>
+        <option value="pinus">Pinus</option>
+        <option value="outro">Outro</option>
+      </select>
+      <select class="filter-select" id="filtClasse" onchange="renderEntradas()">
+        <option value="">Todas as classes</option>
+        <option value="processo">Processo</option>
+        <option value="toras">Toras</option>
+        <option value="cavacos">Cavacos</option>
+      </select>
+      <input class="filter-input" type="text" id="filtFornecedor" placeholder="Filtrar fornecedor…" oninput="renderEntradas()">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Data</th>
+          <th>Fornecedor</th>
+          <th>Espécie</th>
+          <th>Classe</th>
+          <th class="r">Volume</th>
+          <th class="r">Madeira R$/ton</th>
+          <th class="r">Colheita R$/ton</th>
+          <th class="r">Transbordo R$/ton</th>
+          <th class="r">Custo Total</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="tbodyEntradas"></tbody>
+      </table>
+    </div>
+  `;
+  applyFiltEntradas();
+}
+
+function applyFiltEntradas() {
+  const fe = (document.getElementById('filtEspecie')||{}).value || '';
+  const fc = (document.getElementById('filtClasse')||{}).value || '';
+  const ff = ((document.getElementById('filtFornecedor')||{}).value || '').toLowerCase();
+  let rows = entradas.filter(e =>
+    (!fe || e.especie === fe) &&
+    (!fc || e.classe === fc) &&
+    (!ff || (e.fornecedor||'').toLowerCase().includes(ff))
+  );
+  const tbody = document.getElementById('tbodyEntradas');
+  if (!tbody) return;
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Nenhuma entrada encontrada</td></tr>';
+    return;
+  }
+  const totalVol   = rows.reduce((s,e) => s + (e.volume||0), 0);
+  const totalCusto = rows.reduce((s,e) => s + (e.totalValor||0), 0);
+  tbody.innerHTML = rows.map(e => `
+    <tr>
+      <td>${fmtDate(e.data)}</td>
+      <td>${e.fornecedor||'—'}</td>
+      <td>${especieBadge(e.especie)}</td>
+      <td>${classeBadge(e.classe)}</td>
+      <td class="r">${fmtTon(e.volume)}</td>
+      <td class="r">${e.valMadeiraTon ? fmt(e.valMadeiraTon) : '—'}</td>
+      <td class="r">${e.valColheitaTon ? fmt(e.valColheitaTon) : '—'}</td>
+      <td class="r">${e.temTransbordo && e.valTransbordoTon ? fmt(e.valTransbordoTon) : '—'}</td>
+      <td class="r valor-neg">${fmt(e.totalValor)}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-sm btn-icon" title="Editar" onclick="editEntrada('${e.id}')">✏️</button>
+          <button class="btn btn-sm btn-icon btn-danger" title="Excluir" onclick="confirmDel('${COL_ENTRADAS}','${e.id}')">🗑️</button>
+        </div>
+      </td>
+    </tr>
+  `).join('') + `
+    <tr class="table-total">
+      <td colspan="4">Total (${rows.length} registro${rows.length!==1?'s':''})</td>
+      <td class="r">${fmtTon(totalVol)}</td>
+      <td colspan="3"></td>
+      <td class="r valor-neg">${fmt(totalCusto)}</td>
+      <td></td>
+    </tr>
+  `;
+}
+
+function openModalEntrada(id = null) {
+  editingId = id;
+  document.getElementById('modalEntradaTitulo').textContent = id ? 'Editar Entrada' : 'Nova Entrada';
+  const m = id ? entradas.find(e => e.id === id) : null;
+  document.getElementById('eData').value            = m?.data || today();
+  document.getElementById('eFornecedor').value       = m?.fornecedor || '';
+  document.getElementById('eEspecie').value          = m?.especie || '';
+  document.getElementById('eEspecieObs').value       = m?.especieObs || '';
+  document.getElementById('eClasse').value           = m?.classe || '';
+  document.getElementById('eClasseObs').value        = m?.classeObs || '';
+  document.getElementById('eVolume').value           = m?.volume || '';
+  document.getElementById('eUnidade').value          = m?.unidade || 'ton';
+  document.getElementById('eValMadeiraTon').value    = m?.valMadeiraTon || '';
+  document.getElementById('ePrestColheita').value    = m?.prestColheita || '';
+  document.getElementById('eValColheitaTon').value   = m?.valColheitaTon || '';
+  document.getElementById('eTemTransbordo').checked  = m?.temTransbordo || false;
+  document.getElementById('ePrestTransbordo').value  = m?.prestTransbordo || '';
+  document.getElementById('eValTransbordoTon').value = m?.valTransbordoTon || '';
+  document.getElementById('eObs').value              = m?.obs || '';
+  toggleEspecieObs(); toggleClasseObs(); toggleTransbordo(); calcEntrada();
+  document.getElementById('modalEntrada').classList.add('open');
+}
+function editEntrada(id) { openModalEntrada(id); }
+
+function toggleEspecieObs() {
+  document.getElementById('eEspecieObsGroup').style.display =
+    document.getElementById('eEspecie').value === 'outro' ? '' : 'none';
+}
+function toggleClasseObs() {
+  document.getElementById('eClasseObsGroup').style.display =
+    document.getElementById('eClasse').value === 'outro' ? '' : 'none';
+}
+function toggleTransbordo() {
+  document.getElementById('eTransbordoFields').style.display =
+    document.getElementById('eTemTransbordo').checked ? '' : 'none';
+  calcEntrada();
+}
+function calcEntrada() {
+  const vol  = parseFloat(document.getElementById('eVolume').value) || 0;
+  const mad  = parseFloat(document.getElementById('eValMadeiraTon').value) || 0;
+  const col  = parseFloat(document.getElementById('eValColheitaTon').value) || 0;
+  const trb  = document.getElementById('eTemTransbordo').checked
+               ? (parseFloat(document.getElementById('eValTransbordoTon').value) || 0) : 0;
+
+  const vMad = vol * mad;
+  const vCol = vol * col;
+  const vTrb = vol * trb;
+  const tot  = vMad + vCol + vTrb;
+
+  document.getElementById('eValMadeiraTotal').value    = vMad.toLocaleString('pt-BR', {minimumFractionDigits:2});
+  document.getElementById('eValColheitaTotal').value   = vCol.toLocaleString('pt-BR', {minimumFractionDigits:2});
+  document.getElementById('eValTransbordoTotal').value = vTrb.toLocaleString('pt-BR', {minimumFractionDigits:2});
+  document.getElementById('eCalcTotal').textContent = fmt(tot);
+  document.getElementById('eCalcBreakdown').innerHTML = `
+    <div class="calc-row"><span>Madeira</span><span>${fmt(vMad)}</span></div>
+    <div class="calc-row"><span>Colheita/Carreg.</span><span>${fmt(vCol)}</span></div>
+    ${trb > 0 ? `<div class="calc-row"><span>Transbordo</span><span>${fmt(vTrb)}</span></div>` : ''}
+  `;
+}
+
+async function saveEntrada() {
+  const data       = document.getElementById('eData').value;
+  const fornecedor = document.getElementById('eFornecedor').value.trim();
+  const especie    = document.getElementById('eEspecie').value;
+  const classe     = document.getElementById('eClasse').value;
+  const volume     = parseFloat(document.getElementById('eVolume').value) || 0;
+  const madTon     = parseFloat(document.getElementById('eValMadeiraTon').value) || 0;
+
+  if (!data || !fornecedor || !especie || !classe || !volume || !madTon) {
+    toast('Preencha os campos obrigatórios (*)', 'error'); return;
+  }
+
+  const colTon = parseFloat(document.getElementById('eValColheitaTon').value) || 0;
+  const temTrb = document.getElementById('eTemTransbordo').checked;
+  const trbTon = temTrb ? (parseFloat(document.getElementById('eValTransbordoTon').value) || 0) : 0;
+
+  const doc = {
+    data, fornecedor, especie,
+    especieObs: document.getElementById('eEspecieObs').value.trim(),
+    classe,
+    classeObs: document.getElementById('eClasseObs').value.trim(),
+    volume,
+    unidade: document.getElementById('eUnidade').value,
+    valMadeiraTon: madTon,
+    valMadeiraTotal: volume * madTon,
+    prestColheita: document.getElementById('ePrestColheita').value.trim(),
+    valColheitaTon: colTon,
+    valColheitaTotal: volume * colTon,
+    temTransbordo: temTrb,
+    prestTransbordo: document.getElementById('ePrestTransbordo').value.trim(),
+    valTransbordoTon: trbTon,
+    valTransbordoTotal: volume * trbTon,
+    totalValor: volume * (madTon + colTon + trbTon),
+    obs: document.getElementById('eObs').value.trim(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  try {
+    if (editingId) {
+      await db.collection(COL_ENTRADAS).doc(editingId).update(doc);
+      toast('Entrada atualizada!', 'success');
+    } else {
+      doc.criadoEm = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection(COL_ENTRADAS).add(doc);
+      toast('Entrada registrada!', 'success');
+    }
+    closeModal('modalEntrada');
+  } catch(e) { toast('Erro ao salvar: ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SAÍDAS
+// ═══════════════════════════════════════════════════════════════
+function renderSaidas() {
+  document.getElementById('topbarActions').innerHTML =
+    `<button class="btn btn-primary" onclick="openModalSaida()">＋ Nova Saída</button>`;
+
+  const totalVol = saidas.reduce((s,e) => s + (e.volume||0), 0);
+  const totalRec = saidas.reduce((s,e) => s + (e.totalReceita||0), 0);
+
+  document.getElementById('pageContent').innerHTML = `
+    <div class="cards-row" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card">
+        <div class="card-label">Cargas</div>
+        <div class="card-value neu">${saidas.length}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Volume Total</div>
+        <div class="card-value neu">${fmtTon(totalVol)}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Receita Total</div>
+        <div class="card-value pos">${fmt(totalRec)}</div>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <select class="filter-select" id="filtSEspecie" onchange="applySaidaFilts()">
+        <option value="">Todas as espécies</option>
+        <option value="eucalipto">Eucalipto</option>
+        <option value="pinus">Pinus</option>
+        <option value="outro">Outro</option>
+      </select>
+      <input class="filter-input" type="text" id="filtSDestino" placeholder="Filtrar destino…" oninput="applySaidaFilts()">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Data</th>
+          <th>Caminhão</th>
+          <th>Destino</th>
+          <th>Espécie</th>
+          <th>Classe</th>
+          <th class="r">Volume</th>
+          <th class="r">Madeira R$/ton</th>
+          <th class="r">Frete R$/ton</th>
+          <th class="r">Receita Total</th>
+          <th>NF</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="tbodySaidas"></tbody>
+      </table>
+    </div>
+  `;
+  applySaidaFilts();
+}
+
+function applySaidaFilts() {
+  const fe = (document.getElementById('filtSEspecie')||{}).value || '';
+  const fd = ((document.getElementById('filtSDestino')||{}).value || '').toLowerCase();
+  let rows = saidas.filter(s =>
+    (!fe || s.especie === fe) &&
+    (!fd || (s.destino||'').toLowerCase().includes(fd))
+  );
+  const tbody = document.getElementById('tbodySaidas');
+  if (!tbody) return;
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Nenhuma saída encontrada</td></tr>';
+    return;
+  }
+  const totalVol = rows.reduce((s,e) => s + (e.volume||0), 0);
+  const totalRec = rows.reduce((s,e) => s + (e.totalReceita||0), 0);
+  tbody.innerHTML = rows.map(s => `
+    <tr>
+      <td>${fmtDate(s.data)}</td>
+      <td><b>${s.caminhao||'—'}</b></td>
+      <td>${s.destino||'—'}</td>
+      <td>${especieBadge(s.especie)}</td>
+      <td>${classeBadge(s.classe)}</td>
+      <td class="r">${fmtTon(s.volume)}</td>
+      <td class="r">${s.valMadeiraTon ? fmt(s.valMadeiraTon) : '—'}</td>
+      <td class="r">${s.valFreteTon ? fmt(s.valFreteTon) : '—'}</td>
+      <td class="r valor-pos">${fmt(s.totalReceita)}</td>
+      <td>${s.nfNumero ? `<span style="font-size:11px">${s.nfNumero}</span>` : '—'}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-sm btn-icon" onclick="editSaida('${s.id}')">✏️</button>
+          <button class="btn btn-sm btn-icon btn-danger" onclick="confirmDel('${COL_SAIDAS}','${s.id}')">🗑️</button>
+        </div>
+      </td>
+    </tr>
+  `).join('') + `
+    <tr class="table-total">
+      <td colspan="5">Total (${rows.length} carga${rows.length!==1?'s':''})</td>
+      <td class="r">${fmtTon(totalVol)}</td>
+      <td colspan="2"></td>
+      <td class="r valor-pos">${fmt(totalRec)}</td>
+      <td colspan="2"></td>
+    </tr>
+  `;
+}
+
+function openModalSaida(id = null) {
+  editingId = id;
+  document.getElementById('modalSaidaTitulo').textContent = id ? 'Editar Saída' : 'Nova Saída';
+  const m = id ? saidas.find(s => s.id === id) : null;
+  document.getElementById('sData').value          = m?.data || today();
+  document.getElementById('sCaminhao').value       = m?.caminhao || '';
+  document.getElementById('sEspecie').value        = m?.especie || '';
+  document.getElementById('sEspecieObs').value     = m?.especieObs || '';
+  document.getElementById('sClasse').value         = m?.classe || '';
+  document.getElementById('sClasseObs').value      = m?.classeObs || '';
+  document.getElementById('sVolume').value         = m?.volume || '';
+  document.getElementById('sUnidade').value        = m?.unidade || 'ton';
+  document.getElementById('sDestino').value        = m?.destino || '';
+  document.getElementById('sValMadeiraTon').value  = m?.valMadeiraTon || '';
+  document.getElementById('sValFreteTon').value    = m?.valFreteTon || '';
+  document.getElementById('sEmitente').value       = m?.emitente || '';
+  document.getElementById('sNfNumero').value       = m?.nfNumero || '';
+  document.getElementById('sObs').value            = m?.obs || '';
+  toggleSaidaEspecieObs(); toggleSaidaClasseObs(); calcSaida();
+  document.getElementById('modalSaida').classList.add('open');
+}
+function editSaida(id) { openModalSaida(id); }
+
+function toggleSaidaEspecieObs() {
+  document.getElementById('sEspecieObsGroup').style.display =
+    document.getElementById('sEspecie').value === 'outro' ? '' : 'none';
+}
+function toggleSaidaClasseObs() {
+  document.getElementById('sClasseObsGroup').style.display =
+    document.getElementById('sClasse').value === 'outro' ? '' : 'none';
+}
+function calcSaida() {
+  const vol  = parseFloat(document.getElementById('sVolume').value) || 0;
+  const mad  = parseFloat(document.getElementById('sValMadeiraTon').value) || 0;
+  const frt  = parseFloat(document.getElementById('sValFreteTon').value) || 0;
+  const vMad = vol * mad;
+  const vFrt = vol * frt;
+  const tot  = vMad + vFrt;
+  document.getElementById('sValMadeiraTotal').value = vMad.toLocaleString('pt-BR', {minimumFractionDigits:2});
+  document.getElementById('sValFreteTotal').value   = vFrt.toLocaleString('pt-BR', {minimumFractionDigits:2});
+  document.getElementById('sCalcTotal').textContent = fmt(tot);
+  document.getElementById('sCalcBreakdown').innerHTML = `
+    <div class="calc-row"><span>Madeira (${fmt(mad)}/ton)</span><span>${fmt(vMad)}</span></div>
+    <div class="calc-row"><span>Frete (${fmt(frt)}/ton)</span><span>${fmt(vFrt)}</span></div>
+  `;
+}
+
+async function saveSaida() {
+  const data    = document.getElementById('sData').value;
+  const caminhao= document.getElementById('sCaminhao').value.trim();
+  const especie = document.getElementById('sEspecie').value;
+  const classe  = document.getElementById('sClasse').value;
+  const volume  = parseFloat(document.getElementById('sVolume').value) || 0;
+  const destino = document.getElementById('sDestino').value.trim();
+  const madTon  = parseFloat(document.getElementById('sValMadeiraTon').value) || 0;
+
+  if (!data || !caminhao || !especie || !classe || !volume || !destino || !madTon) {
+    toast('Preencha os campos obrigatórios (*)', 'error'); return;
+  }
+
+  const frtTon = parseFloat(document.getElementById('sValFreteTon').value) || 0;
+  const doc = {
+    data, caminhao, especie,
+    especieObs: document.getElementById('sEspecieObs').value.trim(),
+    classe,
+    classeObs: document.getElementById('sClasseObs').value.trim(),
+    volume,
+    unidade: document.getElementById('sUnidade').value,
+    destino,
+    valMadeiraTon: madTon,
+    valMadeiraTotal: volume * madTon,
+    valFreteTon: frtTon,
+    valFreteTotal: volume * frtTon,
+    totalReceita: volume * (madTon + frtTon),
+    emitente: document.getElementById('sEmitente').value.trim(),
+    nfNumero: document.getElementById('sNfNumero').value.trim(),
+    obs: document.getElementById('sObs').value.trim(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  try {
+    if (editingId) {
+      await db.collection(COL_SAIDAS).doc(editingId).update(doc);
+      toast('Saída atualizada!', 'success');
+    } else {
+      doc.criadoEm = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection(COL_SAIDAS).add(doc);
+      toast('Saída registrada!', 'success');
+    }
+    closeModal('modalSaida');
+  } catch(e) { toast('Erro ao salvar: ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGAMENTOS
+// ═══════════════════════════════════════════════════════════════
+function renderPagamentos() {
+  document.getElementById('topbarActions').innerHTML =
+    `<button class="btn btn-primary" onclick="openModalPagamento()">＋ Novo Pagamento</button>`;
+
+  const totalPendente = pagamentos.filter(p => p.status==='pendente').reduce((s,e) => s+(e.valor||0), 0);
+  const totalPago     = pagamentos.filter(p => p.status==='pago').reduce((s,e) => s+(e.valor||0), 0);
+
+  document.getElementById('pageContent').innerHTML = `
+    <div class="cards-row" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card">
+        <div class="card-label">Total Pendente</div>
+        <div class="card-value neg">${fmt(totalPendente)}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Total Pago</div>
+        <div class="card-value pos">${fmt(totalPago)}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Registros</div>
+        <div class="card-value neu">${pagamentos.length}</div>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <select class="filter-select" id="filtPStatus" onchange="applyPagFilts()">
+        <option value="">Todos os status</option>
+        <option value="pendente">Pendente</option>
+        <option value="pago">Pago</option>
+      </select>
+      <input class="filter-input" type="text" id="filtPParceiro" placeholder="Filtrar parceiro…" oninput="applyPagFilts()">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Data</th>
+          <th>Parceiro</th>
+          <th>Referência</th>
+          <th class="r">Valor</th>
+          <th>Status</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="tbodyPagamentos"></tbody>
+      </table>
+    </div>
+  `;
+  applyPagFilts();
+}
+
+function applyPagFilts() {
+  const fs = (document.getElementById('filtPStatus')||{}).value || '';
+  const fp = ((document.getElementById('filtPParceiro')||{}).value || '').toLowerCase();
+  let rows = pagamentos.filter(p =>
+    (!fs || p.status === fs) &&
+    (!fp || (p.parceiro||'').toLowerCase().includes(fp))
+  );
+  const tbody = document.getElementById('tbodyPagamentos');
+  if (!tbody) return;
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Nenhum pagamento encontrado</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(p => `
+    <tr>
+      <td>${fmtDate(p.data)}</td>
+      <td>${p.parceiro||'—'}</td>
+      <td style="color:var(--muted);font-size:11px">${p.referencia||'—'}</td>
+      <td class="r valor-neg">${fmt(p.valor)}</td>
+      <td>
+        ${statusBadge(p.status)}
+        ${p.status==='pendente' ? `<button class="btn btn-sm" style="margin-left:6px" onclick="marcarPago('${p.id}')">✓ Marcar pago</button>` : ''}
+      </td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-sm btn-icon" onclick="editPagamento('${p.id}')">✏️</button>
+          <button class="btn btn-sm btn-icon btn-danger" onclick="confirmDel('${COL_PAGAMENTOS}','${p.id}')">🗑️</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openModalPagamento(id = null) {
+  editingId = id;
+  document.getElementById('modalPagTitulo').textContent = id ? 'Editar Pagamento' : 'Novo Pagamento';
+  const m = id ? pagamentos.find(p => p.id === id) : null;
+  document.getElementById('pData').value      = m?.data || today();
+  document.getElementById('pParceiro').value  = m?.parceiro || '';
+  document.getElementById('pValor').value     = m?.valor || '';
+  document.getElementById('pReferencia').value= m?.referencia || '';
+  document.getElementById('pStatus').value    = m?.status || 'pendente';
+  document.getElementById('pObs').value       = m?.obs || '';
+  document.getElementById('modalPagamento').classList.add('open');
+}
+function editPagamento(id) { openModalPagamento(id); }
+
+async function marcarPago(id) {
+  await db.collection(COL_PAGAMENTOS).doc(id).update({ status: 'pago', updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  toast('Marcado como pago!', 'success');
+}
+
+async function savePagamento() {
+  const data     = document.getElementById('pData').value;
+  const parceiro = document.getElementById('pParceiro').value.trim();
+  const valor    = parseFloat(document.getElementById('pValor').value) || 0;
+  if (!data || !parceiro || !valor) { toast('Preencha os campos obrigatórios', 'error'); return; }
+  const doc = {
+    data, parceiro, valor,
+    referencia: document.getElementById('pReferencia').value.trim(),
+    status: document.getElementById('pStatus').value,
+    obs: document.getElementById('pObs').value.trim(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  try {
+    if (editingId) {
+      await db.collection(COL_PAGAMENTOS).doc(editingId).update(doc);
+      toast('Pagamento atualizado!', 'success');
+    } else {
+      doc.criadoEm = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection(COL_PAGAMENTOS).add(doc);
+      toast('Pagamento registrado!', 'success');
+    }
+    closeModal('modalPagamento');
+  } catch(e) { toast('Erro: ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RECEBIMENTOS
+// ═══════════════════════════════════════════════════════════════
+function renderRecebimentos() {
+  document.getElementById('topbarActions').innerHTML =
+    `<button class="btn btn-primary" onclick="openModalRecebimento()">＋ Novo Recebimento</button>`;
+
+  const totalPendente = recebimentos.filter(r => r.status==='pendente').reduce((s,e) => s+(e.valor||0), 0);
+  const totalRecebido = recebimentos.filter(r => r.status==='recebido').reduce((s,e) => s+(e.valor||0), 0);
+
+  document.getElementById('pageContent').innerHTML = `
+    <div class="cards-row" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card">
+        <div class="card-label">A Receber</div>
+        <div class="card-value pos">${fmt(totalPendente)}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Já Recebido</div>
+        <div class="card-value pos">${fmt(totalRecebido)}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Registros</div>
+        <div class="card-value neu">${recebimentos.length}</div>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <select class="filter-select" id="filtRStatus" onchange="applyRecFilts()">
+        <option value="">Todos os status</option>
+        <option value="pendente">Pendente</option>
+        <option value="recebido">Recebido</option>
+      </select>
+      <input class="filter-input" type="text" id="filtRParceiro" placeholder="Filtrar parceiro…" oninput="applyRecFilts()">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Data</th>
+          <th>Parceiro / Cliente</th>
+          <th>Referência</th>
+          <th class="r">Valor</th>
+          <th>Status</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="tbodyRecebimentos"></tbody>
+      </table>
+    </div>
+  `;
+  applyRecFilts();
+}
+
+function applyRecFilts() {
+  const fs = (document.getElementById('filtRStatus')||{}).value || '';
+  const fp = ((document.getElementById('filtRParceiro')||{}).value || '').toLowerCase();
+  let rows = recebimentos.filter(r =>
+    (!fs || r.status === fs) &&
+    (!fp || (r.parceiro||'').toLowerCase().includes(fp))
+  );
+  const tbody = document.getElementById('tbodyRecebimentos');
+  if (!tbody) return;
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Nenhum recebimento encontrado</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${fmtDate(r.data)}</td>
+      <td>${r.parceiro||'—'}</td>
+      <td style="color:var(--muted);font-size:11px">${r.referencia||'—'}</td>
+      <td class="r valor-pos">${fmt(r.valor)}</td>
+      <td>
+        ${statusBadge(r.status)}
+        ${r.status==='pendente' ? `<button class="btn btn-sm" style="margin-left:6px" onclick="marcarRecebido('${r.id}')">✓ Marcar recebido</button>` : ''}
+      </td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-sm btn-icon" onclick="editRecebimento('${r.id}')">✏️</button>
+          <button class="btn btn-sm btn-icon btn-danger" onclick="confirmDel('${COL_RECEBIMENTOS}','${r.id}')">🗑️</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openModalRecebimento(id = null) {
+  editingId = id;
+  document.getElementById('modalRecTitulo').textContent = id ? 'Editar Recebimento' : 'Novo Recebimento';
+  const m = id ? recebimentos.find(r => r.id === id) : null;
+  document.getElementById('rData').value      = m?.data || today();
+  document.getElementById('rParceiro').value  = m?.parceiro || '';
+  document.getElementById('rValor').value     = m?.valor || '';
+  document.getElementById('rReferencia').value= m?.referencia || '';
+  document.getElementById('rStatus').value    = m?.status || 'pendente';
+  document.getElementById('rObs').value       = m?.obs || '';
+  document.getElementById('modalRecebimento').classList.add('open');
+}
+function editRecebimento(id) { openModalRecebimento(id); }
+
+async function marcarRecebido(id) {
+  await db.collection(COL_RECEBIMENTOS).doc(id).update({ status: 'recebido', updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  toast('Marcado como recebido!', 'success');
+}
+
+async function saveRecebimento() {
+  const data     = document.getElementById('rData').value;
+  const parceiro = document.getElementById('rParceiro').value.trim();
+  const valor    = parseFloat(document.getElementById('rValor').value) || 0;
+  if (!data || !parceiro || !valor) { toast('Preencha os campos obrigatórios', 'error'); return; }
+  const doc = {
+    data, parceiro, valor,
+    referencia: document.getElementById('rReferencia').value.trim(),
+    status: document.getElementById('rStatus').value,
+    obs: document.getElementById('rObs').value.trim(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  try {
+    if (editingId) {
+      await db.collection(COL_RECEBIMENTOS).doc(editingId).update(doc);
+      toast('Recebimento atualizado!', 'success');
+    } else {
+      doc.criadoEm = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection(COL_RECEBIMENTOS).add(doc);
+      toast('Recebimento registrado!', 'success');
+    }
+    closeModal('modalRecebimento');
+  } catch(e) { toast('Erro: ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DELETE
+// ═══════════════════════════════════════════════════════════════
+function confirmDel(collection, id) {
+  document.getElementById('modalDel').classList.add('open');
+  document.getElementById('btnDelConfirm').onclick = async () => {
+    try {
+      await db.collection(collection).doc(id).delete();
+      toast('Registro excluído.', 'success');
+      closeModal('modalDel');
+    } catch(e) { toast('Erro ao excluir: ' + e.message, 'error'); }
+  };
+}
+
+// Fecha modal clicando fora
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+</script>
+</body>
+</html>
