@@ -524,6 +524,16 @@ input[type="checkbox"] { width: auto; cursor: pointer; }
 .import-zone-label { font-size: 13px; font-weight: 500; }
 .import-zone-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
 
+/* ── GDrive sync ── */
+#syncDot.connected { background: var(--green) !important; }
+#syncDot.syncing   { background: var(--yellow) !important; animation: pulse .8s infinite alternate; }
+#syncDot.error     { background: var(--red) !important; }
+#syncLabel.connected { color: var(--green); }
+#syncLabel.error     { color: var(--red); }
+@keyframes pulse { to { opacity:.4; } }
+.gdrive-test-ok  { background: var(--green-lt); color: var(--green); }
+.gdrive-test-err { background: var(--red-lt);   color: var(--red); }
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .sidebar { display: none; }
@@ -649,7 +659,14 @@ input[type="checkbox"] { width: auto; cursor: pointer; }
         <div class="page-title" id="pageTitle">Dashboard</div>
         <div class="page-sub" id="pageSub">Visão geral das operações</div>
       </div>
-      <div id="topbarActions"></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div id="syncStatus" onclick="abrirGDriveConfig()" style="display:none;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--muted);padding:6px 10px;border:1px solid var(--border);border-radius:var(--r);background:#fff;user-select:none">
+          <span id="syncDot" style="width:7px;height:7px;border-radius:50%;background:var(--border);display:inline-block;transition:background .3s"></span>
+          <span id="syncLabel">Google Drive</span>
+          <span id="syncNowBtn" onclick="event.stopPropagation();sincronizarGDrive()" style="display:none;margin-left:2px;font-size:13px" title="Sincronizar agora">↺</span>
+        </div>
+        <div id="topbarActions"></div>
+      </div>
     </div>
     <div class="content" id="pageContent"></div>
   </div>
@@ -995,6 +1012,46 @@ input[type="checkbox"] { width: auto; cursor: pointer; }
   </div>
 </div>
 
+<!-- MODAL GOOGLE DRIVE -->
+<div class="modal-overlay" id="modalGDrive">
+  <div class="modal modal-sm">
+    <div class="modal-title">
+      <span>☁ Google Drive Sync</span>
+      <span class="modal-close" onclick="closeModal('modalGDrive')">×</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px">
+      Cole abaixo a URL do Apps Script implantado no Google Drive. Os dados serão sincronizados automaticamente a cada alteração.
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>URL do Apps Script</label>
+      <input type="url" id="gdriveUrl" placeholder="https://script.google.com/macros/s/…/exec">
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-toggle">
+        <input type="checkbox" id="gdriveSyncAuto" checked> Sincronizar automaticamente ao salvar
+      </label>
+    </div>
+    <div id="gdriveTestResult" style="display:none;font-size:12px;padding:8px 10px;border-radius:var(--r);margin-bottom:12px"></div>
+    <div style="background:var(--paper2);border-radius:var(--r);padding:12px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;margin-bottom:6px">Como configurar:</div>
+      <ol style="font-size:11px;color:var(--muted);padding-left:16px;line-height:1.8">
+        <li>Abra <strong>script.google.com</strong> e crie um novo projeto</li>
+        <li>Clique em <strong>"Copiar código"</strong> abaixo e cole no editor</li>
+        <li>Clique em <strong>Implantar → Nova implantação</strong></li>
+        <li>Tipo: <em>App da Web</em> · Acesso: <em>Qualquer pessoa</em></li>
+        <li>Cole a URL gerada no campo acima</li>
+      </ol>
+      <button class="btn btn-sm" style="margin-top:8px;width:100%;justify-content:center" onclick="copiarAppsScript()">📋 Copiar código do Apps Script</button>
+    </div>
+    <div class="modal-footer" style="flex-wrap:wrap;gap:8px">
+      <button class="btn btn-danger btn-sm" id="btnDesconectar" onclick="desconectarGDrive()" style="display:none">Desconectar</button>
+      <button class="btn btn-sm" onclick="testarConexao()">Testar conexão</button>
+      <button class="btn" onclick="closeModal('modalGDrive')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarGDriveConfig()">Salvar e conectar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL CONFIRMAR EXCLUSÃO -->
 <div class="modal-overlay" id="modalDel">
   <div class="modal modal-sm">
@@ -1137,6 +1194,7 @@ function applyUserUI() {
       if (el) el.style.display = u.permissions[k] === false ? 'none' : 'flex';
     });
   }
+  initSyncUI();
 }
 
 function signIn() {
@@ -1646,6 +1704,7 @@ async function saveEntrada() {
       await db.collection(COL_ENTRADAS).add(doc);
       toast('Entrada registrada!', 'success');
     }
+    syncIfAuto();
     closeModal('modalEntrada');
   } catch(e) { toast('Erro ao salvar: ' + e.message, 'error'); }
 }
@@ -1840,6 +1899,7 @@ async function saveSaida() {
       await db.collection(COL_SAIDAS).add(doc);
       toast('Saída registrada!', 'success');
     }
+    syncIfAuto();
     closeModal('modalSaida');
   } catch(e) { toast('Erro ao salvar: ' + e.message, 'error'); }
 }
@@ -1967,6 +2027,7 @@ async function savePagamento() {
       await db.collection(COL_PAGAMENTOS).add(doc);
       toast('Pagamento registrado!', 'success');
     }
+    syncIfAuto();
     closeModal('modalPagamento');
   } catch(e) { toast('Erro: ' + e.message, 'error'); }
 }
@@ -2094,6 +2155,7 @@ async function saveRecebimento() {
       await db.collection(COL_RECEBIMENTOS).add(doc);
       toast('Recebimento registrado!', 'success');
     }
+    syncIfAuto();
     closeModal('modalRecebimento');
   } catch(e) { toast('Erro: ' + e.message, 'error'); }
 }
@@ -2110,6 +2172,273 @@ function confirmDel(collection, id) {
       closeModal('modalDel');
     } catch(e) { toast('Erro ao excluir: ' + e.message, 'error'); }
   };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GOOGLE DRIVE SYNC
+// ═══════════════════════════════════════════════════════════════
+const GDRIVE_KEY = 'lors_mad_gdrive_config';
+
+let gdriveConfig = (() => {
+  try { return JSON.parse(localStorage.getItem(GDRIVE_KEY)) || {}; } catch(e) { return {}; }
+})();
+
+function setSyncStatus(status, msg) {
+  const dot   = document.getElementById('syncDot');
+  const label = document.getElementById('syncLabel');
+  const btn   = document.getElementById('syncNowBtn');
+  if (!dot) return;
+  dot.className   = status;
+  label.className = status === 'connected' ? 'connected' : status === 'error' ? 'error' : '';
+  label.textContent = msg || (status === 'connected' ? 'Drive conectado' : status === 'syncing' ? 'Sincronizando…' : status === 'error' ? 'Erro de sync' : 'Google Drive');
+  if (btn) btn.style.display = (status === 'connected' || status === 'error') ? 'inline' : 'none';
+}
+
+function initSyncUI() {
+  const el = document.getElementById('syncStatus');
+  if (el) el.style.display = 'flex';
+  if (gdriveConfig.url) {
+    setSyncStatus('connected');
+    document.getElementById('syncNowBtn').style.display = 'inline';
+  } else {
+    setSyncStatus('disconnected');
+  }
+}
+
+async function sincronizarGDrive(silent = false) {
+  if (!gdriveConfig.url) return;
+  setSyncStatus('syncing');
+  try {
+    const payload = {
+      action: 'save',
+      entradas:     entradas,
+      saidas:       saidas,
+      pagamentos:   pagamentos,
+      recebimentos: recebimentos,
+    };
+    const res = await fetch(gdriveConfig.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Falha no script');
+    localStorage.setItem('lors_mad_last_sync', Date.now());
+    setSyncStatus('connected', 'Drive ✓ ' + new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
+    if (!silent) toast('Dados sincronizados com Google Drive!', 'success');
+  } catch(e) {
+    setSyncStatus('error', 'Erro no sync');
+    if (!silent) toast('Falha no Google Drive: ' + e.message, 'error');
+  }
+}
+
+async function carregarDoGDrive() {
+  if (!gdriveConfig.url) return false;
+  setSyncStatus('syncing', 'Carregando Drive…');
+  try {
+    const res = await fetch(gdriveConfig.url + '?action=load', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    if (!json.entradas) throw new Error('Dados inválidos');
+    // Importa cada coleção para o Firestore (sem duplicar)
+    let total = 0;
+    for (const e of (json.entradas||[])) {
+      if (!e.id) continue;
+      await db.collection(COL_ENTRADAS).doc(e.id).set(e, { merge: true });
+      total++;
+    }
+    for (const s of (json.saidas||[])) {
+      if (!s.id) continue;
+      await db.collection(COL_SAIDAS).doc(s.id).set(s, { merge: true });
+      total++;
+    }
+    for (const p of (json.pagamentos||[])) {
+      if (!p.id) continue;
+      await db.collection(COL_PAGAMENTOS).doc(p.id).set(p, { merge: true });
+      total++;
+    }
+    for (const r of (json.recebimentos||[])) {
+      if (!r.id) continue;
+      await db.collection(COL_RECEBIMENTOS).doc(r.id).set(r, { merge: true });
+      total++;
+    }
+    setSyncStatus('connected');
+    toast(`Drive carregado — ${total} registros sincronizados!`, 'success');
+    return true;
+  } catch(e) {
+    setSyncStatus('error', 'Erro ao carregar');
+    toast('Não foi possível carregar do Drive: ' + e.message, 'error');
+    return false;
+  }
+}
+
+async function testarConexao() {
+  const url = document.getElementById('gdriveUrl').value.trim();
+  const res = document.getElementById('gdriveTestResult');
+  res.style.display = 'block';
+  res.className = ''; res.textContent = 'Testando…';
+  if (!url) { res.className = 'gdrive-test-err'; res.textContent = 'Informe a URL.'; return; }
+  try {
+    const r = await fetch(url + '?action=ping', { cache: 'no-store' });
+    const j = await r.json();
+    if (j.ok) {
+      res.className = 'gdrive-test-ok';
+      res.textContent = '✓ Conexão bem-sucedida! Apps Script respondendo.';
+    } else {
+      res.className = 'gdrive-test-err';
+      res.textContent = '✕ Script retornou erro: ' + JSON.stringify(j);
+    }
+  } catch(e) {
+    res.className = 'gdrive-test-err';
+    res.textContent = '✕ Falha: ' + e.message + '. Verifique a URL e as permissões.';
+  }
+}
+
+function abrirGDriveConfig() {
+  document.getElementById('gdriveUrl').value        = gdriveConfig.url || '';
+  document.getElementById('gdriveSyncAuto').checked = gdriveConfig.autoSync !== false;
+  document.getElementById('gdriveTestResult').style.display = 'none';
+  document.getElementById('btnDesconectar').style.display   = gdriveConfig.url ? 'inline-flex' : 'none';
+  document.getElementById('modalGDrive').classList.add('open');
+}
+
+function salvarGDriveConfig() {
+  const url = document.getElementById('gdriveUrl').value.trim();
+  if (!url) { toast('Informe a URL do Apps Script.', 'error'); return; }
+  gdriveConfig = { url, autoSync: document.getElementById('gdriveSyncAuto').checked };
+  localStorage.setItem(GDRIVE_KEY, JSON.stringify(gdriveConfig));
+  closeModal('modalGDrive');
+  initSyncUI();
+  toast('Configuração salva! Sincronizando…', 'success');
+  sincronizarGDrive(true);
+}
+
+function desconectarGDrive() {
+  if (!confirm('Desconectar o Google Drive? Os dados no Firestore serão mantidos.')) return;
+  gdriveConfig = {};
+  localStorage.removeItem(GDRIVE_KEY);
+  closeModal('modalGDrive');
+  setSyncStatus('disconnected');
+  toast('Google Drive desconectado.', 'success');
+}
+
+function copiarAppsScript() {
+  navigator.clipboard.writeText(APPS_SCRIPT_CODE).then(() => {
+    toast('Código copiado! Cole no Apps Script.', 'success');
+  }).catch(() => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([APPS_SCRIPT_CODE], { type: 'text/javascript' }));
+    a.download = 'lors_madeiras_apps_script.js';
+    a.click();
+    toast('Arquivo baixado: lors_madeiras_apps_script.js', 'success');
+  });
+}
+
+const APPS_SCRIPT_CODE = `// ═══════════════════════════════════════════════════════════════
+// LORS Madeiras — Apps Script Sync
+// Cole este código no Google Apps Script e implante como Web App
+// Executar como: Eu | Acesso: Qualquer pessoa
+// ═══════════════════════════════════════════════════════════════
+
+function doGet(e) {
+  const action = (e.parameter && e.parameter.action) || 'load';
+  if (action === 'ping') return json({ ok: true, app: 'LORS Madeiras', ts: new Date().toISOString() });
+  if (action === 'load') return loadAll();
+  return json({ error: 'Ação desconhecida' });
+}
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    if (data.action === 'save') return saveAll(data);
+    return json({ error: 'Ação desconhecida' });
+  } catch(err) {
+    return json({ success: false, error: err.message });
+  }
+}
+
+function loadAll() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  return json({
+    entradas:     sheetToArray(getOrCreate(ss, 'Entradas')),
+    saidas:       sheetToArray(getOrCreate(ss, 'Saidas')),
+    pagamentos:   sheetToArray(getOrCreate(ss, 'Pagamentos')),
+    recebimentos: sheetToArray(getOrCreate(ss, 'Recebimentos')),
+  });
+}
+
+function saveAll(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const colsEntradas = ['id','data','fornecedor','especie','classe','volume','unidade',
+    'valMadeiraTon','valMadeiraTotal','prestColheita','valColheitaTon','valColheitaTotal',
+    'temTransbordo','prestTransbordo','valTransbordoTon','valTransbordoTotal','totalValor','obs'];
+
+  const colsSaidas = ['id','data','caminhao','destino','especie','classe','volume','unidade',
+    'valMadeiraTon','valMadeiraTotal','valFreteTon','valFreteTotal','totalReceita',
+    'emitente','nfNumero','obs'];
+
+  const colsPag = ['id','data','parceiro','valor','referencia','status','obs'];
+  const colsRec = ['id','data','parceiro','valor','referencia','status','obs'];
+
+  arrayToSheet(getOrCreate(ss, 'Entradas'),     data.entradas     || [], colsEntradas);
+  arrayToSheet(getOrCreate(ss, 'Saidas'),       data.saidas       || [], colsSaidas);
+  arrayToSheet(getOrCreate(ss, 'Pagamentos'),   data.pagamentos   || [], colsPag);
+  arrayToSheet(getOrCreate(ss, 'Recebimentos'), data.recebimentos || [], colsRec);
+
+  return json({ success: true, savedAt: new Date().toISOString(),
+    counts: {
+      entradas:     (data.entradas||[]).length,
+      saidas:       (data.saidas||[]).length,
+      pagamentos:   (data.pagamentos||[]).length,
+      recebimentos: (data.recebimentos||[]).length,
+    }
+  });
+}
+
+function getOrCreate(ss, name) {
+  return ss.getSheetByName(name) || ss.insertSheet(name);
+}
+
+function sheetToArray(sheet) {
+  const vals = sheet.getDataRange().getValues();
+  if (vals.length < 2) return [];
+  const headers = vals[0];
+  return vals.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => { if (h) obj[h] = row[i] === '' ? '' : row[i]; });
+    return obj;
+  }).filter(obj => obj.id);
+}
+
+function arrayToSheet(sheet, items, headers) {
+  sheet.clearContents();
+  if (!items.length) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    return;
+  }
+  const rows = [headers, ...items.map(item =>
+    headers.map(h => {
+      const v = item[h];
+      if (v === undefined || v === null) return '';
+      if (typeof v === 'object' && v.seconds) return new Date(v.seconds * 1000).toISOString();
+      return v;
+    })
+  )];
+  sheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
+}
+
+function json(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
+// Chama sync automático após cada operação (se configurado)
+function syncIfAuto() {
+  if (gdriveConfig.url && gdriveConfig.autoSync !== false) {
+    sincronizarGDrive(true);
+  }
 }
 
 // Fecha modal clicando fora
