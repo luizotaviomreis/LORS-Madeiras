@@ -2209,17 +2209,11 @@ async function sincronizarGDrive(silent = false) {
   if (!gdriveConfig.url) return;
   setSyncStatus('syncing');
   try {
-    const payload = JSON.stringify({
-      action: 'save',
-      entradas:     entradas,
-      saidas:       saidas,
-      pagamentos:   pagamentos,
-      recebimentos: recebimentos,
+    const res = await fetch(gdriveConfig.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'save', entradas, saidas, pagamentos, recebimentos }),
     });
-    // Apps Script exige seguir o redirect manualmente — usa fetch com redirect:'follow'
-    // e envia dados como parâmetro GET codificado para evitar bloqueio CORS de POST
-    const url = gdriveConfig.url + '?action=save&d=' + encodeURIComponent(payload);
-    const res = await fetch(url, { redirect: 'follow' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const json = await res.json();
     if (!json.success) throw new Error(json.error || 'Falha no script');
