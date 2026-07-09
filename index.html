@@ -2362,8 +2362,15 @@ function doPost(e) {
   }
 }
 
+function getSpreadsheet() {
+  const name = 'LORS Madeiras — Sync';
+  const files = DriveApp.getFilesByName(name);
+  if (files.hasNext()) return SpreadsheetApp.open(files.next());
+  return SpreadsheetApp.create(name);
+}
+
 function loadAll() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getSpreadsheet();
   return json({
     entradas:     sheetToArray(getOrCreate(ss, 'Entradas')),
     saidas:       sheetToArray(getOrCreate(ss, 'Saidas')),
@@ -2373,7 +2380,7 @@ function loadAll() {
 }
 
 function saveAll(data) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getSpreadsheet();
 
   const colsEntradas = ['id','data','fornecedor','especie','classe','volume','unidade',
     'valMadeiraTon','valMadeiraTotal','prestColheita','valColheitaTon','valColheitaTotal',
