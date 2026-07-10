@@ -888,14 +888,6 @@ input[type="checkbox"] { width: auto; cursor: pointer; }
           <input type="text" id="sValMadeiraTotal" readonly style="background:#f8f7f5;color:var(--muted)">
         </div>
         <div class="form-group">
-          <label>Valor Frete (R$/ton)</label>
-          <input type="number" id="sValFreteTon" placeholder="0,00" step="0.01" min="0" oninput="calcSaida()">
-        </div>
-        <div class="form-group">
-          <label>Receita Frete (R$)</label>
-          <input type="text" id="sValFreteTotal" readonly style="background:#f8f7f5;color:var(--muted)">
-        </div>
-        <div class="form-group">
           <label>Emitente NF</label>
           <input type="text" id="sEmitente" placeholder="Empresa emissora">
         </div>
@@ -914,7 +906,7 @@ input[type="checkbox"] { width: auto; cursor: pointer; }
     </div>
 
     <div class="calc-preview" id="sCalcPreview" style="background: #e8f5ef; border-color: #b7dfc8;">
-      <div class="calc-preview-label">Receita Total da Saída</div>
+      <div class="calc-preview-label">Receita da Saída</div>
       <div class="calc-preview-value" id="sCalcTotal">R$ 0,00</div>
       <div id="sCalcBreakdown"></div>
     </div>
@@ -1752,8 +1744,7 @@ function renderSaidas() {
           <th>Espécie</th>
           <th>Classe</th>
           <th class="r">Volume</th>
-          <th class="r">Madeira R$/ton</th>
-          <th class="r">Frete R$/ton</th>
+          <th class="r">R$/ton</th>
           <th class="r">Receita Total</th>
           <th>NF</th>
           <th></th>
@@ -1775,7 +1766,7 @@ function applySaidaFilts() {
   const tbody = document.getElementById('tbodySaidas');
   if (!tbody) return;
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Nenhuma saída encontrada</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Nenhuma saída encontrada</td></tr>';
     return;
   }
   const totalVol = rows.reduce((s,e) => s + (e.volume||0), 0);
@@ -1789,7 +1780,6 @@ function applySaidaFilts() {
       <td>${classeBadge(s.classe)}</td>
       <td class="r">${fmtTon(s.volume)}</td>
       <td class="r">${s.valMadeiraTon ? fmt(s.valMadeiraTon) : '—'}</td>
-      <td class="r">${s.valFreteTon ? fmt(s.valFreteTon) : '—'}</td>
       <td class="r valor-pos">${fmt(s.totalReceita)}</td>
       <td>${s.nfNumero ? `<span style="font-size:11px">${s.nfNumero}</span>` : '—'}</td>
       <td>
@@ -1803,7 +1793,7 @@ function applySaidaFilts() {
     <tr class="table-total">
       <td colspan="5">Total (${rows.length} carga${rows.length!==1?'s':''})</td>
       <td class="r">${fmtTon(totalVol)}</td>
-      <td colspan="2"></td>
+      <td></td>
       <td class="r valor-pos">${fmt(totalRec)}</td>
       <td colspan="2"></td>
     </tr>
@@ -1844,16 +1834,11 @@ function toggleSaidaClasseObs() {
 function calcSaida() {
   const vol  = parseFloat(document.getElementById('sVolume').value) || 0;
   const mad  = parseFloat(document.getElementById('sValMadeiraTon').value) || 0;
-  const frt  = parseFloat(document.getElementById('sValFreteTon').value) || 0;
   const vMad = vol * mad;
-  const vFrt = vol * frt;
-  const tot  = vMad + vFrt;
   document.getElementById('sValMadeiraTotal').value = vMad.toLocaleString('pt-BR', {minimumFractionDigits:2});
-  document.getElementById('sValFreteTotal').value   = vFrt.toLocaleString('pt-BR', {minimumFractionDigits:2});
-  document.getElementById('sCalcTotal').textContent = fmt(tot);
+  document.getElementById('sCalcTotal').textContent = fmt(vMad);
   document.getElementById('sCalcBreakdown').innerHTML = `
     <div class="calc-row"><span>Madeira (${fmt(mad)}/ton)</span><span>${fmt(vMad)}</span></div>
-    <div class="calc-row"><span>Frete (${fmt(frt)}/ton)</span><span>${fmt(vFrt)}</span></div>
   `;
 }
 
@@ -1870,7 +1855,6 @@ async function saveSaida() {
     toast('Preencha os campos obrigatórios (*)', 'error'); return;
   }
 
-  const frtTon = parseFloat(document.getElementById('sValFreteTon').value) || 0;
   const doc = {
     data, caminhao, especie,
     especieObs: document.getElementById('sEspecieObs').value.trim(),
@@ -1881,9 +1865,7 @@ async function saveSaida() {
     destino,
     valMadeiraTon: madTon,
     valMadeiraTotal: volume * madTon,
-    valFreteTon: frtTon,
-    valFreteTotal: volume * frtTon,
-    totalReceita: volume * (madTon + frtTon),
+    totalReceita: volume * madTon,
     emitente: document.getElementById('sEmitente').value.trim(),
     nfNumero: document.getElementById('sNfNumero').value.trim(),
     obs: document.getElementById('sObs').value.trim(),
